@@ -48,6 +48,11 @@ export default function RootLayout({
   if (pathname === "/login") {
     return (
       <html lang="fr">
+        <head>
+          <link rel="manifest" href="/manifest.json" />
+          <meta name="theme-color" content="#7c3aed" />
+          <meta name="apple-mobile-web-app-capable" content="yes" />
+        </head>
         <body>{children}</body>
       </html>
     );
@@ -56,6 +61,10 @@ export default function RootLayout({
   if (loading) {
     return (
       <html lang="fr">
+        <head>
+          <link rel="manifest" href="/manifest.json" />
+          <meta name="theme-color" content="#7c3aed" />
+        </head>
         <body>
           <div className="min-h-screen flex items-center justify-center bg-slate-100">
             <p className="text-gray-500">Chargement...</p>
@@ -67,6 +76,13 @@ export default function RootLayout({
 
   return (
     <html lang="fr">
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#7c3aed" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+      </head>
       <body className="antialiased bg-slate-100">
         <div className="flex h-screen">
           {/* Sidebar */}
