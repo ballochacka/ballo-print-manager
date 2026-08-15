@@ -1,34 +1,75 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+"use client";
+
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "Ballo Print Manager",
-  description: "Gestion d'imprimerie et personnalisation",
-};
+import { supabase } from "@/lib/supabase";
+import "./globals.css";
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user || null);
+      setLoading(false);
+
+      if (!session && pathname !== "/login") {
+        router.push("/login");
+      }
+    };
+
+    checkUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+      if (!session && pathname !== "/login") {
+        router.push("/login");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [pathname, router]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
+  // Page de login → on affiche sans le menu
+  if (pathname === "/login") {
+    return (
+      <html lang="fr">
+        <body>{children}</body>
+      </html>
+    );
+  }
+
+  if (loading) {
+    return (
+      <html lang="fr">
+        <body>
+          <div className="min-h-screen flex items-center justify-center bg-slate-100">
+            <p className="text-gray-500">Chargement...</p>
+          </div>
+        </body>
+      </html>
+    );
+  }
+
   return (
     <html lang="fr">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-100`}>
+      <body className="antialiased bg-slate-100">
         <div className="flex h-screen">
-          
-          {/* Sidebar blanche */}
+          {/* Sidebar */}
           <aside className="w-60 bg-white border-r border-gray-200 flex flex-col shadow-sm">
             <div className="p-5 border-b border-gray-100">
               <div className="flex items-center gap-2">
@@ -43,36 +84,43 @@ export default function RootLayout({
             </div>
 
             <nav className="flex-1 p-3 space-y-1">
-              <Link href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
+              <Link href="/" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
                 Tableau de bord
               </Link>
-              <Link href="/commandes" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
+              <Link href="/commandes" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
                 Commandes
               </Link>
-              <Link href="/calculateur" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
+              <Link href="/calculateur" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
                 Calculateur
               </Link>
-              <Link href="/stocks" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
+              <Link href="/stocks" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
                 Stocks
               </Link>
-              <Link href="/clients" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
+              <Link href="/clients" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
                 Clients
               </Link>
-              <Link href="/production" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
+              <Link href="/production" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
                 Production
               </Link>
-              <Link href="/facturation" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
+              <Link href="/facturation" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
                 Facturation
               </Link>
-              <Link href="/rapports" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
+              <Link href="/rapports" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
                 Rapports
               </Link>
             </nav>
+
+            <div className="p-4 border-t border-gray-100">
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition"
+              >
+                Déconnexion
+              </button>
+            </div>
           </aside>
 
-          {/* Contenu principal */}
           <main className="flex-1 overflow-auto bg-gradient-to-br from-slate-50 via-purple-50 to-blue-50">
-            {/* Header violet/bleu */}
             <div className="bg-gradient-to-r from-purple-600 to-blue-500 h-2"></div>
             {children}
           </main>
