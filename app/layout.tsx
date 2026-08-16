@@ -32,7 +32,7 @@ export default function RootLayout({
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
-      if (!session && pathname !== "/login") {
+      if (!session && pathname !== "/login" && pathname !== "/boutique") {
         router.push("/login");
       }
     });
@@ -50,7 +50,7 @@ export default function RootLayout({
     router.push("/login");
   };
 
-  if (pathname === "/login") {
+  if (pathname !== "/login" && pathname !== "/boutique") {
     return (
       <html lang="fr">
         <head>
