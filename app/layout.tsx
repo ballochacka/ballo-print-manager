@@ -50,7 +50,7 @@ export default function RootLayout({
     router.push("/login");
   };
 
-  if (pathname !== "/login" && pathname !== "/boutique") {
+  if (pathname === "/login") {
     return (
       <html lang="fr">
         <head>
