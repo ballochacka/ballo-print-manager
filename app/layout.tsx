@@ -57,6 +57,7 @@ export default function RootLayout({
           <link rel="manifest" href="/manifest.json" />
           <meta name="theme-color" content="#7c3aed" />
           <meta name="apple-mobile-web-app-capable" content="yes" />
+          
         </head>
         <body>{children}</body>
       </html>
@@ -143,6 +144,9 @@ export default function RootLayout({
               </Link>
               <Link href="/production" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
                 Production
+              </Link>
+              <Link href="/formation" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
+                 Formation
               </Link>
               <Link href="/facturation" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
                 Facturation
