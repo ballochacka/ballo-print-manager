@@ -157,6 +157,9 @@ export default function RootLayout({
               <Link href="/rapports" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
                 Rapports
               </Link>
+              <Link href="/etiquettes" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
+  Étiquettes
+</Link>
             </nav>
 
             <div className="p-4 border-t border-gray-100">
