@@ -9,12 +9,13 @@ export default function EtiquettesPage() {
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState("");
 
+  const PRIX_M2 = 4500; // FCFA par m²
+
   const [form, setForm] = useState({
     client: "",
     quantite: "1",
     largeur: "",
     hauteur: "",
-    prix_unitaire: "",
   });
 
   const charger = async () => {
@@ -31,27 +32,28 @@ export default function EtiquettesPage() {
     charger();
   }, []);
 
-  const totalEstime =
-    (Number(form.quantite) || 0) * (Number(form.prix_unitaire) || 0);
+  // Calcul automatique
+  const largeurCm = Number(form.largeur) || 0;
+  const hauteurCm = Number(form.hauteur) || 0;
+  const quantite = Number(form.quantite) || 1;
+
+  const surfaceM2 = (largeurCm / 100) * (hauteurCm / 100);
+  const totalEstime = Math.round(surfaceM2 * PRIX_M2 * quantite);
 
   const ajouter = async () => {
-    if (!form.quantite || !form.prix_unitaire) {
-      alert("Quantité et prix obligatoires");
+    if (!form.client || !form.largeur || !form.hauteur) {
+      alert("Client, largeur et hauteur obligatoires");
       return;
     }
 
-    const quantite = Number(form.quantite) || 1;
-    const prix = Number(form.prix_unitaire) || 0;
-    const total = quantite * prix;
-
     const { error } = await supabase.from("etiquettes").insert([
       {
-        client: form.client || "Client",
+        client: form.client,
         quantite,
-        largeur: Number(form.largeur) || 0,
-        hauteur: Number(form.hauteur) || 0,
-        prix_unitaire: prix,
-        total,
+        largeur: largeurCm,
+        hauteur: hauteurCm,
+        prix_unitaire: PRIX_M2,
+        total: totalEstime,
         statut: "En cours",
       },
     ]);
@@ -61,13 +63,7 @@ export default function EtiquettesPage() {
       return;
     }
 
-    setForm({
-      client: "",
-      quantite: "1",
-      largeur: "",
-      hauteur: "",
-      prix_unitaire: "",
-    });
+    setForm({ client: "", quantite: "1", largeur: "", hauteur: "" });
     setShowForm(false);
     setMessage("Étiquettes enregistrées");
     setTimeout(() => setMessage(""), 3000);
@@ -107,6 +103,9 @@ export default function EtiquettesPage() {
         {showForm && (
           <div className="mb-6 bg-white rounded-xl border p-5">
             <h3 className="font-semibold mb-4">Nouvelle commande d'étiquettes</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Prix : 4 500 FCFA / m² — calcul automatique
+            </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input
@@ -136,17 +135,13 @@ export default function EtiquettesPage() {
                 onChange={(e) => setForm({ ...form, hauteur: e.target.value })}
                 className="border rounded-lg px-3 py-2 text-sm"
               />
-              <input
-                type="number"
-                placeholder="Prix unitaire (FCFA)"
-                value={form.prix_unitaire}
-                onChange={(e) => setForm({ ...form, prix_unitaire: e.target.value })}
-                className="border rounded-lg px-3 py-2 text-sm"
-              />
             </div>
 
-            <div className="mt-3 text-sm text-purple-700 font-medium">
-              Total estimé : {totalEstime.toLocaleString("fr-FR")} FCFA
+            <div className="mt-4 p-3 bg-purple-50 rounded-lg text-sm">
+              <p>Surface : <strong>{surfaceM2.toFixed(4)} m²</strong></p>
+              <p className="text-purple-700 font-bold text-base mt-1">
+                Total : {totalEstime.toLocaleString("fr-FR")} FCFA
+              </p>
             </div>
 
             <div className="flex gap-3 mt-4">
@@ -171,9 +166,8 @@ export default function EtiquettesPage() {
                 <thead className="bg-gray-50 text-xs text-gray-500">
                   <tr>
                     <th className="text-left px-4 py-3">Client</th>
-                    <th className="text-left px-4 py-3">Quantité</th>
+                    <th className="text-left px-4 py-3">Qté</th>
                     <th className="text-left px-4 py-3">Dimensions</th>
-                    <th className="text-left px-4 py-3">Prix unit.</th>
                     <th className="text-left px-4 py-3">Total</th>
                     <th className="text-left px-4 py-3">Statut</th>
                     <th className="text-left px-4 py-3">Actions</th>
@@ -187,7 +181,6 @@ export default function EtiquettesPage() {
                       <td className="px-4 py-3">
                         {e.largeur} × {e.hauteur} cm
                       </td>
-                      <td className="px-4 py-3">{e.prix_unitaire?.toLocaleString()} FCFA</td>
                       <td className="px-4 py-3 font-medium text-purple-700">
                         {e.total?.toLocaleString()} FCFA
                       </td>
