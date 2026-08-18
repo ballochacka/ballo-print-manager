@@ -11,7 +11,7 @@ export default function MaillotsPage() {
 
   const [form, setForm] = useState({
     client: "",
-    type_maillot: "Maillot simple",
+    type_maillot: "Maillot personalise avec rank",
     apporte_par_client: true,
     prix_maillot: "0",
     prix_personnalisation: "2000",
@@ -116,15 +116,14 @@ export default function MaillotsPage() {
               />
 
               <select
-                value={form.type_maillot}
-                onChange={(e) => setForm({ ...form, type_maillot: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="Maillot simple">Maillot simple</option>
-                <option value="Maillot sport">Maillot sport</option>
-                <option value="Maillot lourd">Maillot lourd</option>
-                <option value="Autre">Autre</option>
-              </select>
+  value={form.type_maillot}
+  onChange={(e) => setForm({ ...form, type_maillot: e.target.value })}
+  className="w-full border rounded-lg px-3 py-2 text-sm"
+>
+  <option value="Maillot personnalisé avec rank">Maillot personnalisé avec rank</option>
+  <option value="Maillot personnalisé avec vinyle">Maillot personnalisé avec vinyle</option>
+  <option value="Maillot personnalisé avec DTF">Maillot personnalisé avec DTF</option>
+</select>
 
               <div className="flex gap-4 text-sm">
                 <label className="flex items-center gap-2">
