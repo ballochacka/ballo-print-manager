@@ -148,6 +148,9 @@ export default function RootLayout({
               <Link href="/formation" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
                  Formation
               </Link>
+              <Link href="/maillots" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
+                 Maillots
+              </Link>
               <Link href="/facturation" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
                 Facturation
               </Link>
