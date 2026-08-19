@@ -1,192 +1,145 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import Link from "next/link";
 
-export default function DashboardPage() {
-  const [stats, setStats] = useState({
-    commandesJour: 0,
-    ca: 0,
-    alertesStock: 0,
-    enProduction: 0,
-  });
-  const [loading, setLoading] = useState(true);
+const produits = [
+  { id: 1, nom: "T-shirt simple", prix: "3 500 FCFA", description: "T-shirt coton basique" },
+  { id: 2, nom: "T-shirt personnalisé", prix: "5 500 FCFA", description: "Avec impression ou broderie" },
+  { id: 3, nom: "T-shirt lourd personnalisé", prix: "7 500 FCFA", description: "Tissu épais + personnalisation" },
+  { id: 4, nom: "Casquette personnalisée", prix: "4 000 FCFA", description: "Broderie ou impression" },
+  { id: 5, nom: "Mug personnalisé", prix: "3 000 FCFA", description: "Impression haute qualité" },
+  { id: 6, nom: "Pochette personnalisée", prix: "2 500 FCFA", description: "Pochette avec votre design" },
+  { id: 7, nom: "Bol personnalisé", prix: "4 500 FCFA", description: "Bol avec gravure ou impression" },
+  { id: 8, nom: "Flyer / Brochure", prix: "Sur devis", description: "Impression professionnelle" },
+];
 
-  useEffect(() => {
-    async function charger() {
-      const today = new Date().toISOString().slice(0, 10);
+export default function BoutiquePage() {
+  const [selectedProduit, setSelectedProduit] = useState("");
+  const [type, setType] = useState("commande");
+  const [nom, setNom] = useState("");
+  const [prenom, setPrenom] = useState("");
+  const [telephone, setTelephone] = useState("");
+  const [message, setMessage] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-      const { data: commandes } = await supabase.from("commandes").select("*");
-      const { data: stocks } = await supabase.from("stocks").select("*");
-
-      let ca = 0;
-      let commandesJour = 0;
-      let enProduction = 0;
-
-      (commandes || []).forEach((c) => {
-        const vente =
-          parseFloat(
-            (c.montant || "0").toString().replace(/[^\d.,]/g, "").replace(",", ".")
-          ) || 0;
-        ca += vente;
-
-        if (c.created_at && c.created_at.startsWith(today)) {
-          commandesJour += 1;
-        }
-        if (c.statut === "En production") enProduction += 1;
-      });
-
-      const alertesStock = (stocks || []).filter(
-        (s) => (s.quantite || 0) <= (s.seuil || 5)
-      ).length;
-
-      setStats({ commandesJour, ca, alertesStock, enProduction });
-      setLoading(false);
+  const envoyerDemande = async () => {
+    if (!nom || !prenom || !telephone || !selectedProduit) {
+      alert("Merci de remplir tous les champs");
+      return;
     }
 
-    charger();
-  }, []);
+    setLoading(true);
+
+    const { error } = await supabase.from("commandes").insert([
+      {
+        numero: `WEB-${Date.now().toString().slice(-5)}`,
+        client: `${prenom} ${nom}`,
+        produit: selectedProduit,
+        quantite: 1,
+        statut: type === "devis" ? "Devis demandé" : "Commande web",
+        montant: "À confirmer",
+      },
+    ]);
+
+    setLoading(false);
+
+    if (error) {
+      alert("Erreur lors de l'envoi. Réessaie.");
+      return;
+    }
+
+    setSuccess(true);
+    setNom("");
+    setPrenom("");
+    setTelephone("");
+    setSelectedProduit("");
+    setMessage("");
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 text-white">
-      {/* Bandeau haut style imprimerie */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(168,85,247,0.25),_transparent_50%)]"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_rgba(59,130,246,0.2),_transparent_45%)]"></div>
+      <header className="bg-gradient-to-r from-purple-600 to-blue-500 py-10 px-4 text-center">
+        <h1 className="text-3xl md:text-4xl font-bold">Ballo Print</h1>
+        <p className="mt-2 text-purple-100">Personnalisation & Impression professionnelle</p>
+      </header>
 
-        <div className="relative px-4 md:px-8 pt-8 pb-10">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-            <div>
-              <p className="text-purple-300 text-sm font-medium tracking-wide uppercase">
-                Atelier d’impression
-              </p>
-              <h1 className="text-3xl md:text-4xl font-bold mt-1">
-                Ballo Print Manager
-              </h1>
-              <p className="text-slate-300 mt-2 max-w-xl">
-                Tableau de bord de votre imprimerie — commandes, stocks,
-                personnalisation et production en un seul endroit.
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <Link
-                href="/commandes"
-                className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition"
+      <div className="max-w-5xl mx-auto px-4 py-10">
+        <h2 className="text-2xl font-bold mb-6 text-center">Nos Produits</h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-12">
+          {produits.map((p) => (
+            <div key={p.id} className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition">
+              <h3 className="font-semibold text-lg">{p.nom}</h3>
+              <p className="text-sm text-slate-300 mt-1">{p.description}</p>
+              <p className="text-purple-300 font-bold mt-3">{p.prix}</p>
+              <button
+                onClick={() => setSelectedProduit(p.nom)}
+                className="mt-4 w-full bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg text-sm"
               >
-                + Nouvelle commande
-              </Link>
-              <Link
-                href="/rapports"
-                className="bg-white/10 hover:bg-white/15 border border-white/15 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition"
-              >
-                Voir rapports
-              </Link>
+                Choisir
+              </button>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="px-4 md:px-8 pb-10 space-y-8">
-        {/* KPI */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="rounded-2xl p-5 bg-gradient-to-br from-blue-600 to-blue-700 shadow-xl shadow-blue-900/30 border border-white/10">
-            <p className="text-blue-100 text-sm">Commandes du jour</p>
-            <p className="text-3xl font-bold mt-2">
-              {loading ? "..." : stats.commandesJour}
-            </p>
-          </div>
-
-          <div className="rounded-2xl p-5 bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-xl shadow-emerald-900/30 border border-white/10">
-            <p className="text-emerald-100 text-sm">Chiffre d’affaires</p>
-            <p className="text-3xl font-bold mt-2">
-              {loading ? "..." : `${stats.ca.toLocaleString("fr-FR")} FCFA`}
-            </p>
-          </div>
-
-          <div className="rounded-2xl p-5 bg-gradient-to-br from-orange-500 to-orange-600 shadow-xl shadow-orange-900/30 border border-white/10">
-            <p className="text-orange-100 text-sm">Alertes stock</p>
-            <p className="text-3xl font-bold mt-2">
-              {loading ? "..." : stats.alertesStock}
-            </p>
-            <Link href="/stocks" className="text-xs text-orange-100 underline mt-2 inline-block">
-              Voir les stocks
-            </Link>
-          </div>
-
-          <div className="rounded-2xl p-5 bg-gradient-to-br from-violet-500 to-purple-600 shadow-xl shadow-purple-900/30 border border-white/10">
-            <p className="text-violet-100 text-sm">En production</p>
-            <p className="text-3xl font-bold mt-2">
-              {loading ? "..." : stats.enProduction}
-            </p>
-          </div>
+          ))}
         </div>
 
-        {/* Section ateliers */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Link
-            href="/maillots"
-            className="group rounded-2xl p-6 bg-white/5 border border-white/10 hover:bg-white/10 transition backdrop-blur"
-          >
-            <div className="text-3xl mb-3">👕</div>
-            <h3 className="text-lg font-semibold">Personnalisation Maillots</h3>
-            <p className="text-sm text-slate-300 mt-1">
-              Rank, vinyle, DTF — gérez vos personnalisations rapidement.
-            </p>
-          </Link>
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 max-w-lg mx-auto">
+          <h3 className="text-xl font-bold mb-4 text-center">
+            {type === "devis" ? "Demander un devis" : "Passer une commande"}
+          </h3>
 
-          <Link
-            href="/etiquettes"
-            className="group rounded-2xl p-6 bg-white/5 border border-white/10 hover:bg-white/10 transition backdrop-blur"
-          >
-            <div className="text-3xl mb-3">🏷️</div>
-            <h3 className="text-lg font-semibold">Étiquettes grand format</h3>
-            <p className="text-sm text-slate-300 mt-1">
-              Calcul automatique au m² pour vos commandes d’étiquettes.
-            </p>
-          </Link>
+          {success ? (
+            <div className="text-center py-8">
+              <p className="text-green-400 font-medium text-lg">Demande envoyée avec succès !</p>
+              <p className="text-slate-300 mt-2 text-sm">Nous vous contacterons très bientôt.</p>
+              <button onClick={() => setSuccess(false)} className="mt-4 text-purple-300 text-sm underline">
+                Faire une autre demande
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setType("commande")}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium ${
+                    type === "commande" ? "bg-purple-600 text-white" : "bg-white/10 text-slate-300"
+                  }`}
+                >
+                  Commander
+                </button>
+                <button
+                  onClick={() => setType("devis")}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium ${
+                    type === "devis" ? "bg-purple-600 text-white" : "bg-white/10 text-slate-300"
+                  }`}
+                >
+                  Demander un devis
+                </button>
+              </div>
 
-          <Link
-            href="/wifi"
-            className="group rounded-2xl p-6 bg-white/5 border border-white/10 hover:bg-white/10 transition backdrop-blur"
-          >
-            <div className="text-3xl mb-3">📶</div>
-            <h3 className="text-lg font-semibold">WiFi Zone</h3>
-            <p className="text-sm text-slate-300 mt-1">
-              Ventes de forfaits heure, jour et mois.
-            </p>
-          </Link>
-        </div>
+              <input placeholder="Nom" value={nom} onChange={(e) => setNom(e.target.value)} className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-slate-400" />
+              <input placeholder="Prénom" value={prenom} onChange={(e) => setPrenom(e.target.value)} className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-slate-400" />
+              <input placeholder="Téléphone" value={telephone} onChange={(e) => setTelephone(e.target.value)} className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-slate-400" />
 
-        {/* Accès rapide */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h3 className="text-lg font-semibold mb-4">Accès rapide</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Link href="/commandes" className="rounded-xl bg-slate-800/80 hover:bg-slate-700 px-4 py-3 text-sm text-center border border-white/5">
-              Commandes
-            </Link>
-            <Link href="/clients" className="rounded-xl bg-slate-800/80 hover:bg-slate-700 px-4 py-3 text-sm text-center border border-white/5">
-              Clients
-            </Link>
-            <Link href="/stocks" className="rounded-xl bg-slate-800/80 hover:bg-slate-700 px-4 py-3 text-sm text-center border border-white/5">
-              Stocks
-            </Link>
-            <Link href="/formation" className="rounded-xl bg-slate-800/80 hover:bg-slate-700 px-4 py-3 text-sm text-center border border-white/5">
-              Formation
-            </Link>
-            <Link href="/facturation" className="rounded-xl bg-slate-800/80 hover:bg-slate-700 px-4 py-3 text-sm text-center border border-white/5">
-              Facturation
-            </Link>
-            <Link href="/production" className="rounded-xl bg-slate-800/80 hover:bg-slate-700 px-4 py-3 text-sm text-center border border-white/5">
-              Production
-            </Link>
-            <Link href="/rapports" className="rounded-xl bg-slate-800/80 hover:bg-slate-700 px-4 py-3 text-sm text-center border border-white/5">
-              Rapports
-            </Link>
-            <Link href="/boutique" className="rounded-xl bg-slate-800/80 hover:bg-slate-700 px-4 py-3 text-sm text-center border border-white/5">
-              Boutique
-            </Link>
-          </div>
+              <select value={selectedProduit} onChange={(e) => setSelectedProduit(e.target.value)} className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white">
+                <option value="">Sélectionner un produit</option>
+                {produits.map((p) => (
+                  <option key={p.id} value={p.nom}>{p.nom}</option>
+                ))}
+              </select>
+
+              <textarea placeholder="Message (optionnel)" value={message} onChange={(e) => setMessage(e.target.value)} className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-slate-400 h-24" />
+
+              <button
+                onClick={envoyerDemande}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-purple-600 to-blue-500 text-white py-3 rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                {loading ? "Envoi en cours..." : "Envoyer ma demande"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
