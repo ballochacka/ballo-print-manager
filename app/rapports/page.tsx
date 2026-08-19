@@ -18,6 +18,10 @@ export default function RapportsPage() {
     formationsNb: 0,
     etiquettesCA: 0,
     etiquettesNb: 0,
+    wifiCA: 0,
+    wifiCout: 16000,
+    wifiBenefice: 0,
+    wifiNb: 0,
   });
   const [evolution, setEvolution] = useState<{ jour: string; benefice: number }[]>([]);
 
@@ -29,7 +33,9 @@ export default function RapportsPage() {
       const { data: maillots } = await supabase.from("maillots").select("*");
       const { data: eleves } = await supabase.from("eleves").select("*");
       const { data: etiquettes } = await supabase.from("etiquettes").select("*");
+      const { data: wifi } = await supabase.from("wifi_zone").select("*");
 
+      // COMMANDES
       let commandesCA = 0;
       let commandesAchat = 0;
       (commandes || []).forEach((c) => {
@@ -41,6 +47,7 @@ export default function RapportsPage() {
         commandesAchat += c.prix_achat || 0;
       });
 
+      // MAILLOTS
       let maillotsCA = 0;
       let maillotsAchat = 0;
       (maillots || []).forEach((m) => {
@@ -48,19 +55,28 @@ export default function RapportsPage() {
         maillotsAchat += (m.prix_maillot || 0) * (m.quantite || 1);
       });
 
+      // FORMATIONS
       let formationsCA = 0;
       (eleves || []).forEach((e) => {
         formationsCA += e.total_paye || 0;
       });
 
+      // ETIQUETTES
       let etiquettesCA = 0;
       (etiquettes || []).forEach((e) => {
         etiquettesCA += e.total || 0;
       });
 
-      // ===== Évolution par jour =====
-      const map: Record<string, number> = {};
+      // WIFI
+      let wifiCA = 0;
+      (wifi || []).forEach((w) => {
+        wifiCA += w.prix || 0;
+      });
+      const wifiCout = 16000; // coût mensuel
+      const wifiBenefice = wifiCA - wifiCout;
 
+      // Évolution
+      const map: Record<string, number> = {};
       const ajouterJour = (dateStr: string | null, montant: number) => {
         if (!dateStr || !montant) return;
         const jour = new Date(dateStr).toLocaleDateString("fr-FR", {
@@ -75,26 +91,18 @@ export default function RapportsPage() {
           parseFloat(
             (c.montant || "0").toString().replace(/[^\d.,]/g, "").replace(",", ".")
           ) || 0;
-        const benef = vente - (c.prix_achat || 0);
-        ajouterJour(c.created_at, benef);
+        ajouterJour(c.created_at, vente - (c.prix_achat || 0));
       });
-
       (maillots || []).forEach((m) => {
-        const benef = (m.total || 0) - (m.prix_maillot || 0) * (m.quantite || 1);
-        ajouterJour(m.created_at, benef);
+        ajouterJour(m.created_at, (m.total || 0) - (m.prix_maillot || 0) * (m.quantite || 1));
       });
-
-      (eleves || []).forEach((e) => {
-        ajouterJour(e.created_at, e.total_paye || 0);
-      });
-
-      (etiquettes || []).forEach((e) => {
-        ajouterJour(e.created_at, e.total || 0);
-      });
+      (eleves || []).forEach((e) => ajouterJour(e.created_at, e.total_paye || 0));
+      (etiquettes || []).forEach((e) => ajouterJour(e.created_at, e.total || 0));
+      (wifi || []).forEach((w) => ajouterJour(w.created_at, w.prix || 0));
 
       const evo = Object.entries(map)
         .map(([jour, benefice]) => ({ jour, benefice }))
-        .slice(-7); // 7 derniers jours
+        .slice(-7);
 
       setStats({
         commandesCA,
@@ -109,6 +117,10 @@ export default function RapportsPage() {
         formationsNb: eleves?.length || 0,
         etiquettesCA,
         etiquettesNb: etiquettes?.length || 0,
+        wifiCA,
+        wifiCout,
+        wifiBenefice,
+        wifiNb: wifi?.length || 0,
       });
       setEvolution(evo);
       setLoading(false);
@@ -118,13 +130,20 @@ export default function RapportsPage() {
   }, []);
 
   const totalCA =
-    stats.commandesCA + stats.maillotsCA + stats.formationsCA + stats.etiquettesCA;
-  const totalAchat = stats.commandesAchat + stats.maillotsAchat;
+    stats.commandesCA +
+    stats.maillotsCA +
+    stats.formationsCA +
+    stats.etiquettesCA +
+    stats.wifiCA;
+
+  const totalAchat = stats.commandesAchat + stats.maillotsAchat + stats.wifiCout;
+
   const totalBenefice =
     stats.commandesBenefice +
     stats.maillotsBenefice +
     stats.formationsCA +
-    stats.etiquettesCA;
+    stats.etiquettesCA +
+    stats.wifiBenefice;
 
   const maxBenef = Math.max(...evolution.map((e) => Math.abs(e.benefice)), 1);
 
@@ -139,7 +158,6 @@ export default function RapportsPage() {
           <div className="text-center text-gray-500 py-10">Chargement...</div>
         ) : (
           <>
-            {/* Totaux */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-lg">
                 <p className="text-sm text-blue-100">Chiffre d'affaires total</p>
@@ -148,7 +166,7 @@ export default function RapportsPage() {
                 </p>
               </div>
               <div className="bg-gradient-to-br from-orange-400 to-orange-500 rounded-2xl p-5 text-white shadow-lg">
-                <p className="text-sm text-orange-100">Total des achats</p>
+                <p className="text-sm text-orange-100">Total des achats / coûts</p>
                 <p className="text-2xl font-bold mt-1">
                   {totalAchat.toLocaleString("fr-FR")} FCFA
                 </p>
@@ -168,14 +186,13 @@ export default function RapportsPage() {
 
               {evolution.length === 0 ? (
                 <p className="text-gray-400 text-sm text-center py-10">
-                  Pas encore assez de données pour le graphique
+                  Pas encore assez de données
                 </p>
               ) : (
                 <div className="flex items-end justify-between gap-3 h-48">
                   {evolution.map((item, index) => {
                     const height = Math.max((Math.abs(item.benefice) / maxBenef) * 100, 8);
                     const isPositif = item.benefice >= 0;
-
                     return (
                       <div key={index} className="flex-1 flex flex-col items-center gap-2">
                         <span className="text-[10px] font-medium text-gray-600">
@@ -183,7 +200,7 @@ export default function RapportsPage() {
                         </span>
                         <div className="w-full flex items-end justify-center h-36">
                           <div
-                            className={`w-full max-w-[40px] rounded-t-xl transition-all duration-500 ${
+                            className={`w-full max-w-[40px] rounded-t-xl ${
                               isPositif
                                 ? "bg-gradient-to-t from-emerald-500 to-emerald-400"
                                 : "bg-gradient-to-t from-red-500 to-red-400"
@@ -199,21 +216,10 @@ export default function RapportsPage() {
                   })}
                 </div>
               )}
-
-              <div className="flex items-center justify-center gap-6 mt-6 text-xs text-gray-500">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                  Bénéfice
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  Perte
-                </div>
-              </div>
             </div>
 
-            {/* Détail par activité */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Détails */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="bg-white rounded-xl border p-5 shadow-sm">
                 <h3 className="font-semibold text-gray-800 mb-3">Commandes</h3>
                 <p className="text-sm text-gray-500">Nombre : {stats.commandesNb}</p>
@@ -242,6 +248,14 @@ export default function RapportsPage() {
                 <p className="text-sm text-gray-500">Commandes : {stats.etiquettesNb}</p>
                 <p className="text-sm mt-2">CA : <span className="font-bold text-blue-600">{stats.etiquettesCA.toLocaleString()} FCFA</span></p>
                 <p className="text-sm">Bénéfice : <span className="font-bold text-green-600">{stats.etiquettesCA.toLocaleString()} FCFA</span></p>
+              </div>
+
+              <div className="bg-white rounded-xl border p-5 shadow-sm">
+                <h3 className="font-semibold text-gray-800 mb-3">WiFi Zone</h3>
+                <p className="text-sm text-gray-500">Ventes : {stats.wifiNb}</p>
+                <p className="text-sm mt-2">CA : <span className="font-bold text-blue-600">{stats.wifiCA.toLocaleString()} FCFA</span></p>
+                <p className="text-sm">Coût mensuel : <span className="font-bold text-orange-600">{stats.wifiCout.toLocaleString()} FCFA</span></p>
+                <p className="text-sm">Bénéfice : <span className={`font-bold ${stats.wifiBenefice >= 0 ? "text-green-600" : "text-red-600"}`}>{stats.wifiBenefice.toLocaleString()} FCFA</span></p>
               </div>
             </div>
           </>
