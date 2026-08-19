@@ -160,6 +160,9 @@ export default function RootLayout({
               <Link href="/etiquettes" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
   Étiquettes
 </Link>
+<Link href="/wifi" className="block px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition">
+  WiFi Zone
+</Link>
             </nav>
 
             <div className="p-4 border-t border-gray-100">
