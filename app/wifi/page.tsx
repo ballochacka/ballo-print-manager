@@ -24,10 +24,7 @@ export default function WifiPage() {
 
   const charger = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("wifi_zone")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const { data } = await supabase.from("wifi_zone").select("*").order("created_at", { ascending: false });
     setVentes(data || []);
     setLoading(false);
   };
@@ -57,12 +54,7 @@ export default function WifiPage() {
       return;
     }
 
-    setForm({
-      client: "",
-      type_forfait: "Par jour",
-      duree: "1 jour",
-      prix: "",
-    });
+    setForm({ client: "", type_forfait: "Par jour", duree: "1 jour", prix: "" });
     setShowForm(false);
     setMessage("Vente WiFi enregistrée");
     setTimeout(() => setMessage(""), 3000);
@@ -79,77 +71,34 @@ export default function WifiPage() {
     <div>
       <header className="bg-white border-b px-4 md:px-6 py-3 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-800">WiFi Zone</h2>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm"
-        >
+        <button onClick={() => setShowForm(!showForm)} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm">
           + Nouvelle vente
         </button>
       </header>
 
       <div className="p-4 md:p-6">
-        {message && (
-          <div className="mb-4 p-3 bg-green-100 text-green-800 rounded-lg text-sm">
-            {message}
-          </div>
-        )}
+        {message && <div className="mb-4 p-3 bg-green-100 text-green-800 rounded-lg text-sm">{message}</div>}
 
         {showForm && (
           <div className="mb-6 bg-white rounded-xl border p-5">
             <h3 className="font-semibold mb-4">Nouvelle vente WiFi</h3>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                placeholder="Nom du client (optionnel)"
-                value={form.client}
-                onChange={(e) => setForm({ ...form, client: e.target.value })}
-                className="border rounded-lg px-3 py-2 text-sm"
-              />
-
-              <select
-                value={form.type_forfait}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    type_forfait: e.target.value,
-                    duree: forfaits[e.target.value as keyof typeof forfaits][0],
-                  })
-                }
-                className="border rounded-lg px-3 py-2 text-sm"
-              >
+              <input placeholder="Nom du client (optionnel)" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
+              <select value={form.type_forfait} onChange={(e) => setForm({ ...form, type_forfait: e.target.value, duree: forfaits[e.target.value as keyof typeof forfaits][0] })} className="border rounded-lg px-3 py-2 text-sm">
                 <option value="Par heure">Par heure</option>
                 <option value="Par jour">Par jour</option>
                 <option value="Par mois">Par mois</option>
               </select>
-
-              <select
-                value={form.duree}
-                onChange={(e) => setForm({ ...form, duree: e.target.value })}
-                className="border rounded-lg px-3 py-2 text-sm"
-              >
+              <select value={form.duree} onChange={(e) => setForm({ ...form, duree: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
                 {forfaits[form.type_forfait as keyof typeof forfaits].map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
+                  <option key={d} value={d}>{d}</option>
                 ))}
               </select>
-
-              <input
-                type="number"
-                placeholder="Prix (FCFA)"
-                value={form.prix}
-                onChange={(e) => setForm({ ...form, prix: e.target.value })}
-                className="border rounded-lg px-3 py-2 text-sm"
-              />
+              <input type="number" placeholder="Prix (FCFA)" value={form.prix} onChange={(e) => setForm({ ...form, prix: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
             </div>
-
             <div className="flex gap-3 mt-4">
-              <button onClick={ajouter} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm">
-                Enregistrer
-              </button>
-              <button onClick={() => setShowForm(false)} className="bg-gray-100 px-4 py-2 rounded-lg text-sm">
-                Annuler
-              </button>
+              <button onClick={ajouter} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm">Enregistrer</button>
+              <button onClick={() => setShowForm(false)} className="bg-gray-100 px-4 py-2 rounded-lg text-sm">Annuler</button>
             </div>
           </div>
         )}
@@ -157,8 +106,6 @@ export default function WifiPage() {
         <div className="bg-white rounded-xl border overflow-hidden">
           {loading ? (
             <div className="p-8 text-center text-gray-500">Chargement...</div>
-          ) : ventes.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">Aucune vente WiFi</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -178,19 +125,12 @@ export default function WifiPage() {
                       <td className="px-4 py-3 font-medium">{v.client}</td>
                       <td className="px-4 py-3">{v.type_forfait}</td>
                       <td className="px-4 py-3">{v.duree}</td>
-                      <td className="px-4 py-3 font-medium text-purple-700">
-                        {v.prix?.toLocaleString()} FCFA
+                      <td className="px-4 py-3 font-medium text-purple-700">{v.prix?.toLocaleString()} FCFA</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">
+                        {v.created_at ? new Date(v.created_at).toLocaleDateString("fr-FR") : "—"}
                       </td>
                       <td className="px-4 py-3">
-                        {new Date(v.created_at).toLocaleDateString("fr-FR")}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => supprimer(v.id)}
-                          className="text-xs bg-red-100 text-red-600 px-2.5 py-1 rounded"
-                        >
-                          Supprimer
-                        </button>
+                        <button onClick={() => supprimer(v.id)} className="text-xs bg-red-100 text-red-600 px-2.5 py-1 rounded">Supprimer</button>
                       </td>
                     </tr>
                   ))}
