@@ -179,44 +179,108 @@ export default function RapportsPage() {
               </div>
             </div>
 
-            {/* Graphique */}
-            <div className="bg-white rounded-2xl border shadow-sm p-6">
-              <h3 className="font-semibold text-gray-800 mb-1">Évolution des bénéfices</h3>
-              <p className="text-xs text-gray-400 mb-6">7 derniers jours d’activité</p>
+       {/* Graphique pro */}
+<div className="bg-white rounded-2xl border shadow-sm p-6">
+  <div className="flex items-center justify-between mb-1">
+    <h3 className="font-semibold text-gray-800">Évolution des bénéfices</h3>
+    <span className="text-xs text-gray-400">Par date</span>
+  </div>
+  <p className="text-xs text-gray-400 mb-6">Bénéfice ou perte selon les jours</p>
 
-              {evolution.length === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-10">
-                  Pas encore assez de données
-                </p>
-              ) : (
-                <div className="flex items-end justify-between gap-3 h-48">
-                  {evolution.map((item, index) => {
-                    const height = Math.max((Math.abs(item.benefice) / maxBenef) * 100, 8);
-                    const isPositif = item.benefice >= 0;
-                    return (
-                      <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                        <span className="text-[10px] font-medium text-gray-600">
-                          {item.benefice.toLocaleString()}
-                        </span>
-                        <div className="w-full flex items-end justify-center h-36">
-                          <div
-                            className={`w-full max-w-[40px] rounded-t-xl ${
-                              isPositif
-                                ? "bg-gradient-to-t from-emerald-500 to-emerald-400"
-                                : "bg-gradient-to-t from-red-500 to-red-400"
-                            }`}
-                            style={{ height: `${height}%` }}
-                          />
-                        </div>
-                        <span className="text-[11px] text-gray-500 font-medium">
-                          {item.jour}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+  {evolution.length === 0 ? (
+    <p className="text-gray-400 text-sm text-center py-10">
+      Pas encore assez de données
+    </p>
+  ) : (
+    <div className="relative">
+      {/* Zone des barres + courbe */}
+      <div className="relative h-56 flex items-end justify-between gap-2 px-2">
+        
+        {/* Courbe SVG */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+        >
+          <polyline
+            fill="none"
+            stroke="#8b5cf6"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            points={evolution
+              .map((item, i) => {
+                const x = (i / Math.max(evolution.length - 1, 1)) * 100;
+                const y = 100 - Math.max((Math.abs(item.benefice) / maxBenef) * 85, 5);
+                return `\( {x}, \){y}`;
+              })
+              .join(" ")}
+          />
+          {/* Points sur la courbe */}
+          {evolution.map((item, i) => {
+            const x = (i / Math.max(evolution.length - 1, 1)) * 100;
+            const y = 100 - Math.max((Math.abs(item.benefice) / maxBenef) * 85, 5);
+            return (
+              <circle
+                key={i}
+                cx={x}
+                cy={y}
+                r="1.8"
+                fill="#8b5cf6"
+              />
+            );
+          })}
+        </svg>
+
+        {/* Barres */}
+        {evolution.map((item, index) => {
+          const height = Math.max((Math.abs(item.benefice) / maxBenef) * 100, 10);
+          const isPositif = item.benefice >= 0;
+
+          // Couleur progressive
+          let barColor = "from-emerald-400 to-emerald-500";
+          if (!isPositif) barColor = "from-red-400 to-red-500";
+          else if (height < 40) barColor = "from-orange-300 to-orange-400";
+          else if (height < 70) barColor = "from-yellow-300 to-emerald-400";
+
+          return (
+            <div key={index} className="relative z-10 flex-1 flex flex-col items-center gap-2">
+              <span className={`text-[10px] font-bold ${isPositif ? "text-emerald-600" : "text-red-500"}`}>
+                {item.benefice >= 0 ? "+" : ""}
+                {item.benefice.toLocaleString()}
+              </span>
+              <div className="w-full flex items-end justify-center h-40">
+                <div
+                  className={`w-full max-w-[36px] rounded-t-lg bg-gradient-to-t ${barColor} shadow-md transition-all duration-500`}
+                  style={{ height: `${height}%` }}
+                />
+              </div>
+              <span className="text-[11px] text-gray-500 font-medium">
+                {item.jour}
+              </span>
             </div>
+          );
+        })}
+      </div>
+
+      {/* Légende */}
+      <div className="flex items-center justify-center gap-6 mt-6 text-xs text-gray-500">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+          Bénéfice
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+          Perte
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-0.5 bg-purple-500 rounded"></div>
+          Tendance
+        </div>
+      </div>
+    </div>
+  )}
+</div>
 
             {/* Détails */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
