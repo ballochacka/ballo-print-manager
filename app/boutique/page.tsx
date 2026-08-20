@@ -57,11 +57,11 @@ export default function BoutiquePage() {
     }
 
     await supabase.from("notifications").insert([
-      {
-        titre: typeLabel,
-        message: `\( {clientNom} ( \){telephone}) — ${selectedProduit}`,
-      },
-    ]);
+  {
+    titre: typeLabel,
+    message: clientNom + " (" + telephone + ") — " + selectedProduit,
+  },
+]);
 
     const texte = `Nouvelle ${typeLabel}%0AClient: ${clientNom}%0ATél: ${telephone}%0AProduit: ${selectedProduit}%0AMessage: ${message || "Aucun"}`;
     window.open(`https://wa.me/22375137083?text=${texte}`, "_blank");
