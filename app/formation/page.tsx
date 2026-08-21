@@ -37,6 +37,26 @@ export default function FormationPage() {
     chargerEleves();
   }, []);
 
+  // Nombre de mois entre 2 dates (minimum 1)
+  const calculerMois = (debut: string | null, fin: string | null) => {
+    if (!debut || !fin) return 1;
+    const d1 = new Date(debut);
+    const d2 = new Date(fin);
+    let mois = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
+    // Si il y a des jours en plus, on compte un mois supplémentaire
+    if (d2.getDate() > d1.getDate()) mois += 1;
+    return Math.max(mois, 1);
+  };
+
+  const totalAPayer = (e: any) => {
+    const mois = calculerMois(e.date_debut, e.date_fin);
+    return (e.frais_inscription || 0) + (e.mensualite || 0) * mois;
+  };
+
+  const resteAPayer = (e: any) => {
+    return Math.max(0, totalAPayer(e) - (e.total_paye || 0));
+  };
+
   const ajouterEleve = async () => {
     if (!form.nom || !form.prenom || !form.date_debut || !form.date_fin) {
       alert("Nom, prénom, date de début et date de fin sont obligatoires");
@@ -53,7 +73,7 @@ export default function FormationPage() {
         telephone: form.telephone,
         frais_inscription: frais,
         mensualite: mens,
-        total_paye: frais,
+        total_paye: frais, // inscription payée à l'ajout
         statut: "Actif",
         date_inscription: form.date_inscription,
         date_debut: form.date_debut,
@@ -116,27 +136,25 @@ export default function FormationPage() {
     return new Date(d).toLocaleDateString("fr-FR");
   };
 
-  // Alerte si la fin est dans 7 jours ou moins, ou déjà passée
   const getAlerteFin = (dateFin: string | null) => {
     if (!dateFin) return null;
     const fin = new Date(dateFin);
     const aujourdhui = new Date();
     aujourdhui.setHours(0, 0, 0, 0);
     fin.setHours(0, 0, 0, 0);
-
     const diffJours = Math.ceil((fin.getTime() - aujourdhui.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (diffJours < 0) {
-      return { texte: "Formation terminée", couleur: "#dc2626", fond: "#fee2e2" };
-    }
-    if (diffJours === 0) {
-      return { texte: "Termine aujourd'hui", couleur: "#ea580c", fond: "#ffedd5" };
-    }
-    if (diffJours <= 7) {
-      return { texte: `Fin dans \( {diffJours} jour \){diffJours > 1 ? "s" : ""}`, couleur: "#d97706", fond: "#fef3c7" };
-    }
+    if (diffJours < 0) return { texte: "Formation terminée", couleur: "#dc2626", fond: "#fee2e2" };
+    if (diffJours === 0) return { texte: "Termine aujourd'hui", couleur: "#ea580c", fond: "#ffedd5" };
+    if (diffJours <= 7) return { texte: `Fin dans ${diffJours} j`, couleur: "#d97706", fond: "#fef3c7" };
     return null;
   };
+
+  // Aperçu du total pendant la saisie
+  const apercuMois = calculerMois(form.date_debut, form.date_fin);
+  const apercuTotal =
+    (Number(form.frais_inscription) || 0) +
+    (Number(form.mensualite) || 0) * apercuMois;
 
   const alertes = eleves.filter((e) => getAlerteFin(e.date_fin) !== null);
 
@@ -159,7 +177,6 @@ export default function FormationPage() {
           </div>
         )}
 
-        {/* Alertes fin de formation */}
         {alertes.length > 0 && (
           <div style={{ marginBottom: 16, padding: 14, background: "#fff7ed", border: "1px solid #fdba74", borderRadius: 12 }}>
             <strong style={{ color: "#c2410c" }}>⚠ Alertes fin de formation ({alertes.length})</strong>
@@ -185,7 +202,6 @@ export default function FormationPage() {
               <input placeholder="Téléphone" value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} style={inputStyle} />
               <input type="number" placeholder="Frais d'inscription" value={form.frais_inscription} onChange={(e) => setForm({ ...form, frais_inscription: e.target.value })} style={inputStyle} />
               <input type="number" placeholder="Mensualité" value={form.mensualite} onChange={(e) => setForm({ ...form, mensualite: e.target.value })} style={inputStyle} />
-              
               <div>
                 <label style={{ fontSize: 12, color: "#6b7280" }}>Date d'inscription</label>
                 <input type="date" value={form.date_inscription} onChange={(e) => setForm({ ...form, date_inscription: e.target.value })} style={inputStyle} />
@@ -199,6 +215,17 @@ export default function FormationPage() {
                 <input type="date" value={form.date_fin} onChange={(e) => setForm({ ...form, date_fin: e.target.value })} style={inputStyle} />
               </div>
             </div>
+
+            {form.date_debut && form.date_fin && (
+              <div style={{ marginTop: 12, padding: 12, background: "#f5f3ff", borderRadius: 10, fontSize: 13 }}>
+                <div>Durée estimée : <strong>{apercuMois} mois</strong></div>
+                <div>Total à payer : <strong style={{ color: "#7c3aed" }}>{apercuTotal.toLocaleString("fr-FR")} FCFA</strong></div>
+                <div style={{ color: "#6b7280", fontSize: 12, marginTop: 4 }}>
+                  = inscription + (mensualité × {apercuMois})
+                </div>
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
               <button onClick={ajouterEleve} style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>
                 Enregistrer
@@ -221,25 +248,40 @@ export default function FormationPage() {
                 <thead>
                   <tr style={{ background: "#f9fafb", textAlign: "left" }}>
                     <th style={thStyle}>Élève</th>
-                    <th style={thStyle}>Téléphone</th>
-                    <th style={thStyle}>Inscription</th>
-                    <th style={thStyle}>Début</th>
-                    <th style={thStyle}>Fin</th>
+                    <th style={thStyle}>Début / Fin</th>
+                    <th style={thStyle}>Durée</th>
+                    <th style={thStyle}>Total à payer</th>
+                    <th style={thStyle}>Payé</th>
+                    <th style={thStyle}>Reste</th>
                     <th style={thStyle}>Alerte</th>
-                    <th style={thStyle}>Total payé</th>
                     <th style={thStyle}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {eleves.map((e) => {
+                    const mois = calculerMois(e.date_debut, e.date_fin);
+                    const total = totalAPayer(e);
+                    const reste = resteAPayer(e);
                     const alerte = getAlerteFin(e.date_fin);
+
                     return (
                       <tr key={e.id} style={{ borderTop: "1px solid #f3f4f6" }}>
-                        <td style={tdStyle}><strong>{e.prenom} {e.nom}</strong></td>
-                        <td style={tdStyle}>{e.telephone || "—"}</td>
-                        <td style={tdStyle}>{formatDate(e.date_inscription)}</td>
-                        <td style={tdStyle}>{formatDate(e.date_debut)}</td>
-                        <td style={tdStyle}>{formatDate(e.date_fin)}</td>
+                        <td style={tdStyle}>
+                          <strong>{e.prenom} {e.nom}</strong>
+                          <div style={{ fontSize: 11, color: "#6b7280" }}>{e.telephone || ""}</div>
+                        </td>
+                        <td style={tdStyle}>
+                          <div>{formatDate(e.date_debut)}</div>
+                          <div style={{ fontSize: 11, color: "#6b7280" }}>→ {formatDate(e.date_fin)}</div>
+                        </td>
+                        <td style={tdStyle}>{mois} mois</td>
+                        <td style={tdStyle}>{total.toLocaleString("fr-FR")} FCFA</td>
+                        <td style={{ ...tdStyle, color: "#059669", fontWeight: 600 }}>
+                          {(e.total_paye || 0).toLocaleString("fr-FR")} FCFA
+                        </td>
+                        <td style={{ ...tdStyle, color: reste > 0 ? "#ea580c" : "#16a34a", fontWeight: 700 }}>
+                          {reste.toLocaleString("fr-FR")} FCFA
+                        </td>
                         <td style={tdStyle}>
                           {alerte ? (
                             <span style={{ background: alerte.fond, color: alerte.couleur, padding: "3px 8px", borderRadius: 999, fontSize: 11, fontWeight: 600 }}>
@@ -248,9 +290,6 @@ export default function FormationPage() {
                           ) : (
                             <span style={{ color: "#16a34a", fontSize: 12 }}>En cours</span>
                           )}
-                        </td>
-                        <td style={{ ...tdStyle, color: "#059669", fontWeight: 600 }}>
-                          {(e.total_paye || 0).toLocaleString("fr-FR")} FCFA
                         </td>
                         <td style={tdStyle}>
                           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
