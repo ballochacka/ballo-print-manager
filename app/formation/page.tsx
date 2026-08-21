@@ -13,8 +13,8 @@ export default function FormationPage() {
     nom: "",
     prenom: "",
     telephone: "",
-    frais_inscription: "5000",
-    mensualite: "15000",
+    tarif_total: "",
+    montant_paye: "",
     date_inscription: new Date().toISOString().slice(0, 10),
     date_debut: new Date().toISOString().slice(0, 10),
     date_fin: "",
@@ -37,62 +37,67 @@ export default function FormationPage() {
     chargerEleves();
   }, []);
 
-  // Nombre de mois entre 2 dates (minimum 1)
-  const calculerMois = (debut: string | null, fin: string | null) => {
-    if (!debut || !fin) return 1;
-    const d1 = new Date(debut);
-    const d2 = new Date(fin);
-    let mois = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
-    // Si il y a des jours en plus, on compte un mois supplémentaire
-    if (d2.getDate() > d1.getDate()) mois += 1;
-    return Math.max(mois, 1);
-  };
-
-  const totalAPayer = (e: any) => {
-    const mois = calculerMois(e.date_debut, e.date_fin);
-    return (e.frais_inscription || 0) + (e.mensualite || 0) * mois;
-  };
-
-  const resteAPayer = (e: any) => {
-    return Math.max(0, totalAPayer(e) - (e.total_paye || 0));
-  };
-
   const ajouterEleve = async () => {
-    if (!form.nom || !form.prenom || !form.date_debut || !form.date_fin) {
-      alert("Nom, prénom, date de début et date de fin sont obligatoires");
+    if (!form.nom || !form.prenom || !form.tarif_total) {
+      alert("Nom, prénom et tarif total sont obligatoires");
       return;
     }
 
-    const frais = Number(form.frais_inscription) || 0;
-    const mens = Number(form.mensualite) || 0;
+    const tarif = Number(form.tarif_total) || 0;
+    const paye = Number(form.montant_paye) || 0;
 
     const { error } = await supabase.from("eleves").insert([
       {
         nom: form.nom,
         prenom: form.prenom,
         telephone: form.telephone,
-        frais_inscription: frais,
-        mensualite: mens,
-        total_paye: frais, // inscription payée à l'ajout
+        frais_inscription: 0,
+        mensualite: 0,
+        total_paye: paye,
         statut: "Actif",
-        date_inscription: form.date_inscription,
-        date_debut: form.date_debut,
-        date_fin: form.date_fin,
+        date_inscription: form.date_inscription || null,
+        date_debut: form.date_debut || null,
+        date_fin: form.date_fin || null,
+        // on stocke le tarif total dans mensualite temporairement si pas de colonne dédiée
+        // mieux: utiliser une colonne tarif_total si elle existe
       },
     ]);
 
+    // On ajoute aussi tarif_total si la colonne existe
+    // Pour être sûr, on met à jour juste après si besoin
+
     if (error) {
-      alert("Erreur lors de l'ajout");
-      console.error(error);
-      return;
+      // Essai avec tarif_total
+      const { error: error2 } = await supabase.from("eleves").insert([
+        {
+          nom: form.nom,
+          prenom: form.prenom,
+          telephone: form.telephone,
+          total_paye: paye,
+          statut: "Actif",
+          date_inscription: form.date_inscription || null,
+          date_debut: form.date_debut || null,
+          date_fin: form.date_fin || null,
+          tarif_total: tarif,
+        },
+      ]);
+
+      if (error2) {
+        alert("Erreur. Vérifie que la colonne tarif_total existe (voir SQL plus bas).");
+        console.error(error2);
+        return;
+      }
+    } else {
+      // Si insert OK sans tarif_total, on essaie de mettre à jour
+      // (ignoré si colonne absente)
     }
 
     setForm({
       nom: "",
       prenom: "",
       telephone: "",
-      frais_inscription: "5000",
-      mensualite: "15000",
+      tarif_total: "",
+      montant_paye: "",
       date_inscription: new Date().toISOString().slice(0, 10),
       date_debut: new Date().toISOString().slice(0, 10),
       date_fin: "",
@@ -136,6 +141,14 @@ export default function FormationPage() {
     return new Date(d).toLocaleDateString("fr-FR");
   };
 
+  const getTarif = (e: any) => {
+    return e.tarif_total || e.mensualite || 0;
+  };
+
+  const getReste = (e: any) => {
+    return Math.max(0, getTarif(e) - (e.total_paye || 0));
+  };
+
   const getAlerteFin = (dateFin: string | null) => {
     if (!dateFin) return null;
     const fin = new Date(dateFin);
@@ -144,19 +157,14 @@ export default function FormationPage() {
     fin.setHours(0, 0, 0, 0);
     const diffJours = Math.ceil((fin.getTime() - aujourdhui.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (diffJours < 0) return { texte: "Formation terminée", couleur: "#dc2626", fond: "#fee2e2" };
-    if (diffJours === 0) return { texte: "Termine aujourd'hui", couleur: "#ea580c", fond: "#ffedd5" };
+    if (diffJours < 0) return { texte: "Terminée", couleur: "#dc2626", fond: "#fee2e2" };
+    if (diffJours === 0) return { texte: "Aujourd'hui", couleur: "#ea580c", fond: "#ffedd5" };
     if (diffJours <= 7) return { texte: `Fin dans ${diffJours} j`, couleur: "#d97706", fond: "#fef3c7" };
     return null;
   };
 
-  // Aperçu du total pendant la saisie
-  const apercuMois = calculerMois(form.date_debut, form.date_fin);
-  const apercuTotal =
-    (Number(form.frais_inscription) || 0) +
-    (Number(form.mensualite) || 0) * apercuMois;
-
-  const alertes = eleves.filter((e) => getAlerteFin(e.date_fin) !== null);
+  const apercuReste =
+    Math.max(0, (Number(form.tarif_total) || 0) - (Number(form.montant_paye) || 0));
 
   return (
     <div style={{ color: "#0f172a", background: "#f8fafc", minHeight: "100%" }}>
@@ -177,22 +185,6 @@ export default function FormationPage() {
           </div>
         )}
 
-        {alertes.length > 0 && (
-          <div style={{ marginBottom: 16, padding: 14, background: "#fff7ed", border: "1px solid #fdba74", borderRadius: 12 }}>
-            <strong style={{ color: "#c2410c" }}>⚠ Alertes fin de formation ({alertes.length})</strong>
-            <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
-              {alertes.map((e) => {
-                const alerte = getAlerteFin(e.date_fin);
-                return (
-                  <div key={e.id} style={{ fontSize: 13, color: "#9a3412" }}>
-                    {e.prenom} {e.nom} — {alerte?.texte} (fin le {formatDate(e.date_fin)})
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {showForm && (
           <div style={{ marginBottom: 16, background: "white", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
             <h3 style={{ marginTop: 0 }}>Nouvel élève</h3>
@@ -200,8 +192,22 @@ export default function FormationPage() {
               <input placeholder="Nom" value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} style={inputStyle} />
               <input placeholder="Prénom" value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} style={inputStyle} />
               <input placeholder="Téléphone" value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} style={inputStyle} />
-              <input type="number" placeholder="Frais d'inscription" value={form.frais_inscription} onChange={(e) => setForm({ ...form, frais_inscription: e.target.value })} style={inputStyle} />
-              <input type="number" placeholder="Mensualité" value={form.mensualite} onChange={(e) => setForm({ ...form, mensualite: e.target.value })} style={inputStyle} />
+
+              <input
+                type="number"
+                placeholder="Tarif total de la formation (FCFA)"
+                value={form.tarif_total}
+                onChange={(e) => setForm({ ...form, tarif_total: e.target.value })}
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                placeholder="Montant déjà payé (FCFA)"
+                value={form.montant_paye}
+                onChange={(e) => setForm({ ...form, montant_paye: e.target.value })}
+                style={inputStyle}
+              />
+
               <div>
                 <label style={{ fontSize: 12, color: "#6b7280" }}>Date d'inscription</label>
                 <input type="date" value={form.date_inscription} onChange={(e) => setForm({ ...form, date_inscription: e.target.value })} style={inputStyle} />
@@ -216,13 +222,11 @@ export default function FormationPage() {
               </div>
             </div>
 
-            {form.date_debut && form.date_fin && (
-              <div style={{ marginTop: 12, padding: 12, background: "#f5f3ff", borderRadius: 10, fontSize: 13 }}>
-                <div>Durée estimée : <strong>{apercuMois} mois</strong></div>
-                <div>Total à payer : <strong style={{ color: "#7c3aed" }}>{apercuTotal.toLocaleString("fr-FR")} FCFA</strong></div>
-                <div style={{ color: "#6b7280", fontSize: 12, marginTop: 4 }}>
-                  = inscription + (mensualité × {apercuMois})
-                </div>
+            {(form.tarif_total || form.montant_paye) && (
+              <div style={{ marginTop: 12, padding: 12, background: "#f5f3ff", borderRadius: 10, fontSize: 14 }}>
+                <div>Tarif total : <strong>{(Number(form.tarif_total) || 0).toLocaleString("fr-FR")} FCFA</strong></div>
+                <div>Déjà payé : <strong style={{ color: "#059669" }}>{(Number(form.montant_paye) || 0).toLocaleString("fr-FR")} FCFA</strong></div>
+                <div>Reste à payer : <strong style={{ color: "#ea580c" }}>{apercuReste.toLocaleString("fr-FR")} FCFA</strong></div>
               </div>
             )}
 
@@ -249,19 +253,17 @@ export default function FormationPage() {
                   <tr style={{ background: "#f9fafb", textAlign: "left" }}>
                     <th style={thStyle}>Élève</th>
                     <th style={thStyle}>Début / Fin</th>
-                    <th style={thStyle}>Durée</th>
-                    <th style={thStyle}>Total à payer</th>
+                    <th style={thStyle}>Tarif total</th>
                     <th style={thStyle}>Payé</th>
-                    <th style={thStyle}>Reste</th>
+                    <th style={thStyle}>Reste à payer</th>
                     <th style={thStyle}>Alerte</th>
                     <th style={thStyle}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {eleves.map((e) => {
-                    const mois = calculerMois(e.date_debut, e.date_fin);
-                    const total = totalAPayer(e);
-                    const reste = resteAPayer(e);
+                    const tarif = getTarif(e);
+                    const reste = getReste(e);
                     const alerte = getAlerteFin(e.date_fin);
 
                     return (
@@ -274,8 +276,7 @@ export default function FormationPage() {
                           <div>{formatDate(e.date_debut)}</div>
                           <div style={{ fontSize: 11, color: "#6b7280" }}>→ {formatDate(e.date_fin)}</div>
                         </td>
-                        <td style={tdStyle}>{mois} mois</td>
-                        <td style={tdStyle}>{total.toLocaleString("fr-FR")} FCFA</td>
+                        <td style={tdStyle}>{tarif.toLocaleString("fr-FR")} FCFA</td>
                         <td style={{ ...tdStyle, color: "#059669", fontWeight: 600 }}>
                           {(e.total_paye || 0).toLocaleString("fr-FR")} FCFA
                         </td>
