@@ -22,13 +22,17 @@ export default function FormationPage() {
 
   const [paiementId, setPaiementId] = useState<string | null>(null);
   const [montantPaiement, setMontantPaiement] = useState("");
+  const [editTarifId, setEditTarifId] = useState<string | null>(null);
+  const [editTarifValue, setEditTarifValue] = useState("");
 
   const chargerEleves = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("eleves")
       .select("*")
       .order("created_at", { ascending: false });
+
+    if (error) console.error(error);
     setEleves(data || []);
     setLoading(false);
   };
@@ -38,8 +42,12 @@ export default function FormationPage() {
   }, []);
 
   const ajouterEleve = async () => {
-    if (!form.nom || !form.prenom || !form.tarif_total) {
-      alert("Nom, prénom et tarif total sont obligatoires");
+    if (!form.nom || !form.prenom) {
+      alert("Nom et prénom obligatoires");
+      return;
+    }
+    if (!form.tarif_total) {
+      alert("Le tarif total est obligatoire");
       return;
     }
 
@@ -50,46 +58,22 @@ export default function FormationPage() {
       {
         nom: form.nom,
         prenom: form.prenom,
-        telephone: form.telephone,
-        frais_inscription: 0,
-        mensualite: 0,
+        telephone: form.telephone || null,
+        tarif_total: tarif,
         total_paye: paye,
         statut: "Actif",
         date_inscription: form.date_inscription || null,
         date_debut: form.date_debut || null,
         date_fin: form.date_fin || null,
-        // on stocke le tarif total dans mensualite temporairement si pas de colonne dédiée
-        // mieux: utiliser une colonne tarif_total si elle existe
+        frais_inscription: 0,
+        mensualite: 0,
       },
     ]);
 
-    // On ajoute aussi tarif_total si la colonne existe
-    // Pour être sûr, on met à jour juste après si besoin
-
     if (error) {
-      // Essai avec tarif_total
-      const { error: error2 } = await supabase.from("eleves").insert([
-        {
-          nom: form.nom,
-          prenom: form.prenom,
-          telephone: form.telephone,
-          total_paye: paye,
-          statut: "Actif",
-          date_inscription: form.date_inscription || null,
-          date_debut: form.date_debut || null,
-          date_fin: form.date_fin || null,
-          tarif_total: tarif,
-        },
-      ]);
-
-      if (error2) {
-        alert("Erreur. Vérifie que la colonne tarif_total existe (voir SQL plus bas).");
-        console.error(error2);
-        return;
-      }
-    } else {
-      // Si insert OK sans tarif_total, on essaie de mettre à jour
-      // (ignoré si colonne absente)
+      alert("Erreur : " + error.message);
+      console.error(error);
+      return;
     }
 
     setForm({
@@ -118,15 +102,35 @@ export default function FormationPage() {
     const eleve = eleves.find((e) => e.id === id);
     if (!eleve) return;
 
-    const nouveauTotal = (eleve.total_paye || 0) + montant;
-
-    await supabase
+    const { error } = await supabase
       .from("eleves")
-      .update({ total_paye: nouveauTotal })
+      .update({ total_paye: (eleve.total_paye || 0) + montant })
       .eq("id", id);
+
+    if (error) {
+      alert("Erreur paiement");
+      return;
+    }
 
     setPaiementId(null);
     setMontantPaiement("");
+    chargerEleves();
+  };
+
+  const sauvegarderTarif = async (id: string) => {
+    const tarif = Number(editTarifValue) || 0;
+    const { error } = await supabase
+      .from("eleves")
+      .update({ tarif_total: tarif })
+      .eq("id", id);
+
+    if (error) {
+      alert("Erreur : " + error.message);
+      return;
+    }
+
+    setEditTarifId(null);
+    setEditTarifValue("");
     chargerEleves();
   };
 
@@ -141,12 +145,8 @@ export default function FormationPage() {
     return new Date(d).toLocaleDateString("fr-FR");
   };
 
-  const getTarif = (e: any) => {
-    return e.tarif_total || e.mensualite || 0;
-  };
-
   const getReste = (e: any) => {
-    return Math.max(0, getTarif(e) - (e.total_paye || 0));
+    return Math.max(0, (e.tarif_total || 0) - (e.total_paye || 0));
   };
 
   const getAlerteFin = (dateFin: string | null) => {
@@ -163,8 +163,10 @@ export default function FormationPage() {
     return null;
   };
 
-  const apercuReste =
-    Math.max(0, (Number(form.tarif_total) || 0) - (Number(form.montant_paye) || 0));
+  const apercuReste = Math.max(
+    0,
+    (Number(form.tarif_total) || 0) - (Number(form.montant_paye) || 0)
+  );
 
   return (
     <div style={{ color: "#0f172a", background: "#f8fafc", minHeight: "100%" }}>
@@ -192,22 +194,8 @@ export default function FormationPage() {
               <input placeholder="Nom" value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} style={inputStyle} />
               <input placeholder="Prénom" value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} style={inputStyle} />
               <input placeholder="Téléphone" value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} style={inputStyle} />
-
-              <input
-                type="number"
-                placeholder="Tarif total de la formation (FCFA)"
-                value={form.tarif_total}
-                onChange={(e) => setForm({ ...form, tarif_total: e.target.value })}
-                style={inputStyle}
-              />
-              <input
-                type="number"
-                placeholder="Montant déjà payé (FCFA)"
-                value={form.montant_paye}
-                onChange={(e) => setForm({ ...form, montant_paye: e.target.value })}
-                style={inputStyle}
-              />
-
+              <input type="number" placeholder="Tarif total (FCFA)" value={form.tarif_total} onChange={(e) => setForm({ ...form, tarif_total: e.target.value })} style={inputStyle} />
+              <input type="number" placeholder="Montant déjà payé (FCFA)" value={form.montant_paye} onChange={(e) => setForm({ ...form, montant_paye: e.target.value })} style={inputStyle} />
               <div>
                 <label style={{ fontSize: 12, color: "#6b7280" }}>Date d'inscription</label>
                 <input type="date" value={form.date_inscription} onChange={(e) => setForm({ ...form, date_inscription: e.target.value })} style={inputStyle} />
@@ -262,7 +250,6 @@ export default function FormationPage() {
                 </thead>
                 <tbody>
                   {eleves.map((e) => {
-                    const tarif = getTarif(e);
                     const reste = getReste(e);
                     const alerte = getAlerteFin(e.date_fin);
 
@@ -276,7 +263,32 @@ export default function FormationPage() {
                           <div>{formatDate(e.date_debut)}</div>
                           <div style={{ fontSize: 11, color: "#6b7280" }}>→ {formatDate(e.date_fin)}</div>
                         </td>
-                        <td style={tdStyle}>{tarif.toLocaleString("fr-FR")} FCFA</td>
+                        <td style={tdStyle}>
+                          {editTarifId === e.id ? (
+                            <div style={{ display: "flex", gap: 4 }}>
+                              <input
+                                type="number"
+                                value={editTarifValue}
+                                onChange={(ev) => setEditTarifValue(ev.target.value)}
+                                style={{ width: 90, padding: 4, borderRadius: 6, border: "1px solid #d1d5db" }}
+                              />
+                              <button onClick={() => sauvegarderTarif(e.id)} style={{ background: "#16a34a", color: "white", border: "none", borderRadius: 6, padding: "4px 6px", cursor: "pointer", fontSize: 11 }}>
+                                OK
+                              </button>
+                            </div>
+                          ) : (
+                            <span
+                              onClick={() => {
+                                setEditTarifId(e.id);
+                                setEditTarifValue(String(e.tarif_total || 0));
+                              }}
+                              style={{ cursor: "pointer", textDecoration: "underline" }}
+                              title="Cliquer pour modifier"
+                            >
+                              {(e.tarif_total || 0).toLocaleString("fr-FR")} FCFA
+                            </span>
+                          )}
+                        </td>
                         <td style={{ ...tdStyle, color: "#059669", fontWeight: 600 }}>
                           {(e.total_paye || 0).toLocaleString("fr-FR")} FCFA
                         </td>
