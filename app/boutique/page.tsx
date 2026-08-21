@@ -29,52 +29,58 @@ export default function BoutiquePage() {
   const [loading, setLoading] = useState(false);
 
   const envoyerDemande = async () => {
-    if (!nom || !prenom || !telephone || !selectedProduit) {
-      alert("Merci de remplir tous les champs");
-      return;
-    }
+  if (!nom || !prenom || !telephone || !selectedProduit) {
+    alert("Merci de remplir tous les champs");
+    return;
+  }
 
-    setLoading(true);
+  setLoading(true);
 
-    const clientNom = `${prenom} ${nom}`;
-    const typeLabel = type === "devis" ? "Devis demandé" : "Commande web";
+  const clientNom = prenom + " " + nom;
+  const typeLabel = type === "devis" ? "Devis demandé" : "Commande web";
+  const messageNotif = clientNom + " (" + telephone + ") — " + selectedProduit;
 
-    const { error } = await supabase.from("commandes").insert([
-      {
-        numero: `WEB-${Date.now().toString().slice(-5)}`,
-        client: clientNom,
-        produit: selectedProduit,
-        quantite: 1,
-        statut: typeLabel,
-        montant: "À confirmer",
-      },
-    ]);
+  const { error } = await supabase.from("commandes").insert([
+    {
+      numero: "WEB-" + Date.now().toString().slice(-5),
+      client: clientNom,
+      produit: selectedProduit,
+      quantite: 1,
+      statut: typeLabel,
+      montant: "À confirmer",
+    },
+  ]);
 
-    if (error) {
-      setLoading(false);
-      alert("Erreur lors de l'envoi. Réessaie.");
-      return;
-    }
-
-    await supabase.from("notifications").insert([
-  {
-    titre: typeLabel,
-    message: clientNom + " (" + telephone + ") — " + selectedProduit,
-  },
-]);
-
-    const texte = `Nouvelle ${typeLabel}%0AClient: ${clientNom}%0ATél: ${telephone}%0AProduit: ${selectedProduit}%0AMessage: ${message || "Aucun"}`;
-    window.open(`https://wa.me/22375137083?text=${texte}`, "_blank");
-
+  if (error) {
     setLoading(false);
-    setSuccess(true);
-    setNom("");
-    setPrenom("");
-    setTelephone("");
-    setSelectedProduit("");
-    setMessage("");
-  };
+    alert("Erreur lors de l'envoi. Réessaie.");
+    return;
+  }
 
+  await supabase.from("notifications").insert([
+    {
+      titre: typeLabel,
+      message: messageNotif,
+    },
+  ]);
+
+  const texteWhatsApp =
+    "Nouvelle " + typeLabel +
+    "%0AClient: " + clientNom +
+    "%0ATel: " + telephone +
+    "%0AProduit: " + selectedProduit +
+    "%0AMessage: " + (message || "Aucun");
+
+  window.open("https://wa.me/22375137083?text=" + texteWhatsApp, "_blank");
+
+  setLoading(false);
+  setSuccess(true);
+  setNom("");
+  setPrenom("");
+  setTelephone("");
+  setSelectedProduit("");
+  setMessage("");
+};
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f172a, #3b0764, #0f172a)", color: "white" }}>
       <header style={{ background: "linear-gradient(90deg, #7c3aed, #2563eb)", padding: "40px 16px", textAlign: "center" }}>

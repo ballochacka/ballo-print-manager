@@ -154,6 +154,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/facturation" style={linkStyle("/facturation")}>Facturation</Link>
               <Link href="/rapports" style={linkStyle("/rapports")}>Rapports</Link>
               <Link href="/boutique" style={linkStyle("/boutique")}>Boutique</Link>
+           <Link href="/depenses" style={linkStyle("/depenses")}>Dépenses</Link>
             </nav>
 
             <div style={{ padding: 12, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
