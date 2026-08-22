@@ -35,16 +35,18 @@ export default function LeconsPage() {
   }, []);
 
   const telechargerFichier = async (file: File) => {
-    const nomFichier = `\( {Date.now()}- \){file.name.replace(/\s/g, "_")}`;
-    const { error } = await supabase.storage
-      .from("Lecons")
-      .upload(nomFichier, file);
+  const nomPropre = file.name.replace(/\s/g, "_").replace(/[^\w.\-]/g, "");
+  const nomFichier = Date.now() + "-" + nomPropre;
 
-    if (error) throw error;
+  const { error } = await supabase.storage
+    .from("Lecons")
+    .upload(nomFichier, file);
 
-    const { data } = supabase.storage.from("Lecons").getPublicUrl(nomFichier);
-    return data.publicUrl;
-  };
+  if (error) throw error;
+
+  const { data } = supabase.storage.from("Lecons").getPublicUrl(nomFichier);
+  return data.publicUrl;
+};
 
   const ajouter = async () => {
     if (!form.titre) {
