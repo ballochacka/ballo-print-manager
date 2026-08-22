@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function RapportsPage() {
   const [loading, setLoading] = useState(true);
-  const [mois, setMois] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [mois, setMois] = useState(new Date().toISOString().slice(0, 7));
   const [stats, setStats] = useState({
     commandesCA: 0,
     commandesAchat: 0,
@@ -26,6 +26,7 @@ export default function RapportsPage() {
     depensesTotal: 0,
     depensesNb: 0,
   });
+  const [evolution, setEvolution] = useState<{ jour: string; benefice: number }[]>([]);
 
   useEffect(() => {
     async function charger() {
@@ -87,7 +88,36 @@ export default function RapportsPage() {
         depensesNb += 1;
       });
 
-      const wifiCout = 16000;
+      // Graphique par jour du mois
+      const map: Record<string, number> = {};
+      const ajouterJour = (dateStr: string | null, montant: number) => {
+        if (!dateStr || !dansMois(dateStr)) return;
+        const jour = new Date(dateStr).toLocaleDateString("fr-FR", {
+          day: "2-digit",
+          month: "2-digit",
+        });
+        map[jour] = (map[jour] || 0) + montant;
+      };
+
+      (commandes || []).forEach((c: any) => {
+        const vente = parseFloat((c.montant || "0").toString().replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
+        ajouterJour(c.created_at, vente - (c.prix_achat || 0));
+      });
+      (maillots || []).forEach((m: any) => {
+        ajouterJour(m.created_at, (m.total || 0) - (m.prix_maillot || 0) * (m.quantite || 1));
+      });
+      (eleves || []).forEach((e: any) => ajouterJour(e.created_at, e.total_paye || 0));
+      (etiquettes || []).forEach((e: any) => ajouterJour(e.created_at, e.total || 0));
+      (wifi || []).forEach((w: any) => ajouterJour(w.created_at, w.prix || 0));
+      (depenses || []).forEach((d: any) => ajouterJour(d.created_at, -(d.montant || 0)));
+
+      const evo = Object.entries(map)
+        .map(([jour, benefice]) => ({ jour, benefice }))
+        .sort((a, b) => {
+          const [da, ma] = a.jour.split("/").map(Number);
+          const [db, mb] = b.jour.split("/").map(Number);
+          return ma === mb ? da - db : ma - mb;
+        });
 
       setStats({
         commandesCA,
@@ -103,12 +133,13 @@ export default function RapportsPage() {
         etiquettesCA,
         etiquettesNb,
         wifiCA,
-        wifiCout,
-        wifiBenefice: wifiCA - wifiCout,
+        wifiCout: 16000,
+        wifiBenefice: wifiCA - 16000,
         wifiNb,
         depensesTotal,
         depensesNb,
       });
+      setEvolution(evo);
       setLoading(false);
     }
 
@@ -117,13 +148,17 @@ export default function RapportsPage() {
 
   const totalCA =
     stats.commandesCA + stats.maillotsCA + stats.formationsCA + stats.etiquettesCA + stats.wifiCA;
-  const totalAchat = stats.commandesAchat + stats.maillotsAchat + stats.wifiCout + stats.depensesTotal;
+  const totalAchat =
+    stats.commandesAchat + stats.maillotsAchat + stats.wifiCout + stats.depensesTotal;
   const totalBenefice =
-    stats.commandesBenefice + stats.maillotsBenefice + stats.formationsCA + stats.etiquettesCA + stats.wifiBenefice - stats.depensesTotal;
+    stats.commandesBenefice +
+    stats.maillotsBenefice +
+    stats.formationsCA +
+    stats.etiquettesCA +
+    stats.wifiBenefice -
+    stats.depensesTotal;
 
-  const imprimerRapport = () => {
-    window.print();
-  };
+  const maxBenef = Math.max(...evolution.map((e) => Math.abs(e.benefice)), 1);
 
   const labelMois = new Date(mois + "-01").toLocaleDateString("fr-FR", {
     month: "long",
@@ -142,7 +177,7 @@ export default function RapportsPage() {
             style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #d1d5db" }}
           />
           <button
-            onClick={imprimerRapport}
+            onClick={() => window.print()}
             style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}
           >
             Imprimer ce mois
@@ -174,6 +209,44 @@ export default function RapportsPage() {
               </div>
             </div>
 
+            {/* Graphique */}
+            <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, marginBottom: 20 }}>
+              <h3 style={{ marginTop: 0 }}>Évolution des bénéfices</h3>
+              <p style={{ marginTop: -6, color: "#6b7280", fontSize: 12 }}>Par jour sur le mois sélectionné</p>
+
+              {evolution.length === 0 ? (
+                <p style={{ textAlign: "center", color: "#9ca3af", padding: 30 }}>Pas de données pour ce mois</p>
+              ) : (
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 180, marginTop: 12, overflowX: "auto" }}>
+                  {evolution.map((item, index) => {
+                    const height = Math.max((Math.abs(item.benefice) / maxBenef) * 100, 8);
+                    const isPositif = item.benefice >= 0;
+                    return (
+                      <div key={index} style={{ flex: "1 0 40px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: isPositif ? "#059669" : "#dc2626" }}>
+                          {item.benefice.toLocaleString("fr-FR")}
+                        </span>
+                        <div style={{ width: "100%", maxWidth: 36, height: 120, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                          <div
+                            style={{
+                              width: "100%",
+                              height: height + "%",
+                              borderRadius: "8px 8px 0 0",
+                              background: isPositif
+                                ? "linear-gradient(to top, #10b981, #34d399)"
+                                : "linear-gradient(to top, #ef4444, #f87171)",
+                            }}
+                          />
+                        </div>
+                        <span style={{ fontSize: 11, color: "#6b7280" }}>{item.jour}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Détails */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
               {[
                 ["Commandes", stats.commandesNb, stats.commandesCA, stats.commandesAchat, stats.commandesBenefice],
