@@ -38,12 +38,12 @@ export default function LeconsPage() {
     const nomFichier = `\( {Date.now()}- \){file.name.replace(/\s/g, "_")}`;
 
     const { error } = await supabase.storage
-      .from("LECONS")
+      .from("Lecons")
       .upload(nomFichier, file);
 
     if (error) throw error;
 
-    const { data } = supabase.storage.from("LECONS").getPublicUrl(nomFichier);
+    const { data } = supabase.storage.from("Lecons").getPublicUrl(nomFichier);
     return data.publicUrl;
   };
 
