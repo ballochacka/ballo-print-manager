@@ -8,12 +8,14 @@ export default function LeconsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const [form, setForm] = useState({
     titre: "",
     matiere: "Word",
     description: "",
     duree: "",
+    fichier: null as File | null,
   });
 
   const matieres = ["Word", "Excel", "PowerPoint", "Internet", "Photoshop", "Autre"];
@@ -32,37 +34,71 @@ export default function LeconsPage() {
     charger();
   }, []);
 
+  const telechargerFichier = async (file: File) => {
+    const nomFichier = `\( {Date.now()}- \){file.name.replace(/\s/g, "_")}`;
+    const { error } = await supabase.storage
+      .from("lecons")
+      .upload(nomFichier, file);
+
+    if (error) throw error;
+
+    const { data } = supabase.storage.from("lecons").getPublicUrl(nomFichier);
+    return data.publicUrl;
+  };
+
   const ajouter = async () => {
     if (!form.titre) {
       alert("Le titre est obligatoire");
       return;
     }
 
-    const { error } = await supabase.from("lecons").insert([
-      {
-        titre: form.titre,
-        matiere: form.matiere,
-        description: form.description,
-        duree: form.duree,
-      },
-    ]);
+    setUploading(true);
+    let fichier_url = null;
 
-    if (error) {
-      alert("Erreur lors de l'ajout");
-      return;
+    try {
+      if (form.fichier) {
+        fichier_url = await telechargerFichier(form.fichier);
+      }
+
+      const { error } = await supabase.from("lecons").insert([
+        {
+          titre: form.titre,
+          matiere: form.matiere,
+          description: form.description,
+          duree: form.duree,
+          fichier_url,
+        },
+      ]);
+
+      if (error) throw error;
+
+      setForm({ titre: "", matiere: "Word", description: "", duree: "", fichier: null });
+      setShowForm(false);
+      setMessage("Leçon ajoutée avec succès");
+      setTimeout(() => setMessage(""), 3000);
+      charger();
+    } catch (err: any) {
+      alert("Erreur : " + (err.message || "upload impossible"));
+      console.error(err);
     }
 
-    setForm({ titre: "", matiere: "Word", description: "", duree: "" });
-    setShowForm(false);
-    setMessage("Leçon ajoutée");
-    setTimeout(() => setMessage(""), 3000);
-    charger();
+    setUploading(false);
   };
 
   const supprimer = async (id: string) => {
     if (!confirm("Supprimer cette leçon ?")) return;
     await supabase.from("lecons").delete().eq("id", id);
     charger();
+  };
+
+  const imprimer = (url: string) => {
+    const w = window.open(url, "_blank");
+    if (w) {
+      w.onload = () => {
+        w.focus();
+        w.print();
+      };
+    }
   };
 
   return (
@@ -104,7 +140,7 @@ export default function LeconsPage() {
                 ))}
               </select>
               <input
-                placeholder="Durée (ex: 1h, 2 séances)"
+                placeholder="Durée (ex: 1h)"
                 value={form.duree}
                 onChange={(e) => setForm({ ...form, duree: e.target.value })}
                 style={inputStyle}
@@ -113,14 +149,41 @@ export default function LeconsPage() {
                 placeholder="Description (optionnel)"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                style={{ ...inputStyle, gridColumn: "1 / -1", minHeight: 80 }}
+                style={{ ...inputStyle, gridColumn: "1 / -1", minHeight: 70 }}
               />
+
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={{ fontSize: 13, color: "#6b7280", display: "block", marginBottom: 6 }}>
+                  Téléverser le PDF de la leçon
+                </label>
+                <input
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  onChange={(e) =>
+                    setForm({ ...form, fichier: e.target.files?.[0] || null })
+                  }
+                  style={{ fontSize: 13 }}
+                />
+                {form.fichier && (
+                  <p style={{ fontSize: 12, color: "#059669", marginTop: 6 }}>
+                    Fichier choisi : {form.fichier.name}
+                  </p>
+                )}
+              </div>
             </div>
+
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              <button onClick={ajouter} style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>
-                Enregistrer
+              <button
+                onClick={ajouter}
+                disabled={uploading}
+                style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}
+              >
+                {uploading ? "Envoi..." : "Enregistrer"}
               </button>
-              <button onClick={() => setShowForm(false)} style={{ background: "#f3f4f6", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>
+              <button
+                onClick={() => setShowForm(false)}
+                style={{ background: "#f3f4f6", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}
+              >
                 Annuler
               </button>
             </div>
@@ -140,32 +203,51 @@ export default function LeconsPage() {
                     <th style={thStyle}>Titre</th>
                     <th style={thStyle}>Matière</th>
                     <th style={thStyle}>Durée</th>
-                    <th style={thStyle}>Description</th>
-                    <th style={thStyle}>Date</th>
+                    <th style={thStyle}>Fichier</th>
                     <th style={thStyle}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {lecons.map((l) => (
                     <tr key={l.id} style={{ borderTop: "1px solid #f3f4f6" }}>
-                      <td style={tdStyle}><strong>{l.titre}</strong></td>
+                      <td style={tdStyle}>
+                        <strong>{l.titre}</strong>
+                        {l.description && (
+                          <div style={{ fontSize: 11, color: "#6b7280" }}>{l.description}</div>
+                        )}
+                      </td>
                       <td style={tdStyle}>
                         <span style={{ background: "#ede9fe", color: "#6d28d9", padding: "3px 8px", borderRadius: 999, fontSize: 11 }}>
                           {l.matiere}
                         </span>
                       </td>
                       <td style={tdStyle}>{l.duree || "—"}</td>
-                      <td style={tdStyle}>{l.description || "—"}</td>
-                      <td style={{ ...tdStyle, color: "#6b7280", fontSize: 12 }}>
-                        {l.created_at ? new Date(l.created_at).toLocaleDateString("fr-FR") : "—"}
+                      <td style={tdStyle}>
+                        {l.fichier_url ? (
+                          <a href={l.fichier_url} target="_blank" rel="noreferrer" style={{ color: "#2563eb", fontSize: 12 }}>
+                            Voir le PDF
+                          </a>
+                        ) : (
+                          <span style={{ color: "#9ca3af" }}>Aucun</span>
+                        )}
                       </td>
                       <td style={tdStyle}>
-                        <button
-                          onClick={() => supprimer(l.id)}
-                          style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: 11 }}
-                        >
-                          Supprimer
-                        </button>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {l.fichier_url && (
+                            <button
+                              onClick={() => imprimer(l.fichier_url)}
+                              style={{ background: "#dbeafe", color: "#1d4ed8", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: 11 }}
+                            >
+                              Imprimer
+                            </button>
+                          )}
+                          <button
+                            onClick={() => supprimer(l.id)}
+                            style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: 11 }}
+                          >
+                            Supprimer
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
