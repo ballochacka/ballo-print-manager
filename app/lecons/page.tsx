@@ -20,6 +20,15 @@ export default function LeconsPage() {
 
   const matieres = ["Word", "Excel", "PowerPoint", "Internet", "Photoshop", "Autre"];
 
+  const couleurs: Record<string, string> = {
+    Word: "#2563eb",
+    Excel: "#16a34a",
+    PowerPoint: "#ea580c",
+    Internet: "#7c3aed",
+    Photoshop: "#db2777",
+    Autre: "#64748b",
+  };
+
   const charger = async () => {
     setLoading(true);
     const { data } = await supabase
@@ -35,18 +44,18 @@ export default function LeconsPage() {
   }, []);
 
   const telechargerFichier = async (file: File) => {
-  const nomPropre = file.name.replace(/\s/g, "_").replace(/[^\w.\-]/g, "");
-  const nomFichier = Date.now() + "-" + nomPropre;
+    const nomPropre = file.name.replace(/\s/g, "_").replace(/[^\w.\-]/g, "");
+    const nomFichier = Date.now() + "-" + nomPropre;
 
-  const { error } = await supabase.storage
-    .from("Lecons")
-    .upload(nomFichier, file);
+    const { error } = await supabase.storage
+      .from("Lecons")
+      .upload(nomFichier, file);
 
-  if (error) throw error;
+    if (error) throw error;
 
-  const { data } = supabase.storage.from("Lecons").getPublicUrl(nomFichier);
-  return data.publicUrl;
-};
+    const { data } = supabase.storage.from("Lecons").getPublicUrl(nomFichier);
+    return data.publicUrl;
+  };
 
   const ajouter = async () => {
     if (!form.titre) {
@@ -81,7 +90,6 @@ export default function LeconsPage() {
       charger();
     } catch (err: any) {
       alert("Erreur : " + (err.message || "upload impossible"));
-      console.error(err);
     }
 
     setUploading(false);
@@ -126,46 +134,19 @@ export default function LeconsPage() {
           <div style={{ marginBottom: 16, background: "white", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
             <h3 style={{ marginTop: 0 }}>Nouvelle leçon</h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-              <input
-                placeholder="Titre de la leçon"
-                value={form.titre}
-                onChange={(e) => setForm({ ...form, titre: e.target.value })}
-                style={inputStyle}
-              />
-              <select
-                value={form.matiere}
-                onChange={(e) => setForm({ ...form, matiere: e.target.value })}
-                style={inputStyle}
-              >
+              <input placeholder="Titre de la leçon" value={form.titre} onChange={(e) => setForm({ ...form, titre: e.target.value })} style={inputStyle} />
+              <select value={form.matiere} onChange={(e) => setForm({ ...form, matiere: e.target.value })} style={inputStyle}>
                 {matieres.map((m) => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <input
-                placeholder="Durée (ex: 1h)"
-                value={form.duree}
-                onChange={(e) => setForm({ ...form, duree: e.target.value })}
-                style={inputStyle}
-              />
-              <textarea
-                placeholder="Description (optionnel)"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                style={{ ...inputStyle, gridColumn: "1 / -1", minHeight: 70 }}
-              />
-
+              <input placeholder="Durée (ex: 1h)" value={form.duree} onChange={(e) => setForm({ ...form, duree: e.target.value })} style={inputStyle} />
+              <textarea placeholder="Description (optionnel)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} style={{ ...inputStyle, gridColumn: "1 / -1", minHeight: 70 }} />
               <div style={{ gridColumn: "1 / -1" }}>
                 <label style={{ fontSize: 13, color: "#6b7280", display: "block", marginBottom: 6 }}>
                   Téléverser le PDF de la leçon
                 </label>
-                <input
-                  type="file"
-                  accept="application/pdf,.pdf"
-                  onChange={(e) =>
-                    setForm({ ...form, fichier: e.target.files?.[0] || null })
-                  }
-                  style={{ fontSize: 13 }}
-                />
+                <input type="file" accept="application/pdf,.pdf" onChange={(e) => setForm({ ...form, fichier: e.target.files?.[0] || null })} style={{ fontSize: 13 }} />
                 {form.fichier && (
                   <p style={{ fontSize: 12, color: "#059669", marginTop: 6 }}>
                     Fichier choisi : {form.fichier.name}
@@ -173,91 +154,124 @@ export default function LeconsPage() {
                 )}
               </div>
             </div>
-
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              <button
-                onClick={ajouter}
-                disabled={uploading}
-                style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}
-              >
+              <button onClick={ajouter} disabled={uploading} style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>
                 {uploading ? "Envoi..." : "Enregistrer"}
               </button>
-              <button
-                onClick={() => setShowForm(false)}
-                style={{ background: "#f3f4f6", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}
-              >
+              <button onClick={() => setShowForm(false)} style={{ background: "#f3f4f6", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>
                 Annuler
               </button>
             </div>
           </div>
         )}
 
-        <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
-          {loading ? (
-            <div style={{ padding: 24, textAlign: "center" }}>Chargement...</div>
-          ) : lecons.length === 0 ? (
-            <div style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>Aucune leçon enregistrée</div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: "#f9fafb", textAlign: "left" }}>
-                    <th style={thStyle}>Titre</th>
-                    <th style={thStyle}>Matière</th>
-                    <th style={thStyle}>Durée</th>
-                    <th style={thStyle}>Fichier</th>
-                    <th style={thStyle}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lecons.map((l) => (
-                    <tr key={l.id} style={{ borderTop: "1px solid #f3f4f6" }}>
-                      <td style={tdStyle}>
-                        <strong>{l.titre}</strong>
-                        {l.description && (
-                          <div style={{ fontSize: 11, color: "#6b7280" }}>{l.description}</div>
-                        )}
-                      </td>
-                      <td style={tdStyle}>
-                        <span style={{ background: "#ede9fe", color: "#6d28d9", padding: "3px 8px", borderRadius: 999, fontSize: 11 }}>
-                          {l.matiere}
-                        </span>
-                      </td>
-                      <td style={tdStyle}>{l.duree || "—"}</td>
-                      <td style={tdStyle}>
-                        {l.fichier_url ? (
-                          <a href={l.fichier_url} target="_blank" rel="noreferrer" style={{ color: "#2563eb", fontSize: 12 }}>
-                            Voir le PDF
-                          </a>
-                        ) : (
-                          <span style={{ color: "#9ca3af" }}>Aucun</span>
-                        )}
-                      </td>
-                      <td style={tdStyle}>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {l.fichier_url && (
-                            <button
-                              onClick={() => imprimer(l.fichier_url)}
-                              style={{ background: "#dbeafe", color: "#1d4ed8", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: 11 }}
-                            >
-                              Imprimer
-                            </button>
-                          )}
-                          <button
-                            onClick={() => supprimer(l.id)}
-                            style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: 11 }}
+        {loading ? (
+          <div style={{ padding: 24, textAlign: "center" }}>Chargement...</div>
+        ) : lecons.length === 0 ? (
+          <div style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>Aucune leçon enregistrée</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+            {lecons.map((l) => {
+              const couleur = couleurs[l.matiere] || "#64748b";
+              return (
+                <div
+                  key={l.id}
+                  style={{
+                    background: "white",
+                    borderRadius: 16,
+                    border: "1px solid #e5e7eb",
+                    overflow: "hidden",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: 110,
+                      background: couleur,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "white",
+                      fontSize: 28,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {l.matiere}
+                  </div>
+
+                  <div style={{ padding: 14, flex: 1, display: "flex", flexDirection: "column" }}>
+                    <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>{l.titre}</h3>
+                    <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
+                      Durée : {l.duree || "—"}
+                    </p>
+                    {l.description && (
+                      <p style={{ margin: "8px 0 0", fontSize: 12, color: "#64748b" }}>
+                        {l.description}
+                      </p>
+                    )}
+
+                    <div style={{ marginTop: "auto", paddingTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {l.fichier_url ? (
+                        <>
+                          <a
+                            href={l.fichier_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              background: "#dbeafe",
+                              color: "#1d4ed8",
+                              textDecoration: "none",
+                              borderRadius: 8,
+                              padding: "6px 10px",
+                              fontSize: 12,
+                              fontWeight: 600,
+                            }}
                           >
-                            Supprimer
+                            📄 Voir PDF
+                          </a>
+                          <button
+                            onClick={() => imprimer(l.fichier_url)}
+                            style={{
+                              background: "#f3e8ff",
+                              color: "#7c3aed",
+                              border: "none",
+                              borderRadius: 8,
+                              padding: "6px 10px",
+                              fontSize: 12,
+                              cursor: "pointer",
+                              fontWeight: 600,
+                            }}
+                          >
+                            🖨️ Imprimer
                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                        </>
+                      ) : (
+                        <span style={{ fontSize: 12, color: "#9ca3af" }}>Pas de PDF</span>
+                      )}
+                      <button
+                        onClick={() => supprimer(l.id)}
+                        style={{
+                          background: "#fee2e2",
+                          color: "#dc2626",
+                          border: "none",
+                          borderRadius: 8,
+                          padding: "6px 10px",
+                          fontSize: 12,
+                          cursor: "pointer",
+                          marginLeft: "auto",
+                        }}
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -269,14 +283,4 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 8,
   border: "1px solid #d1d5db",
   boxSizing: "border-box",
-};
-
-const thStyle: React.CSSProperties = {
-  padding: "10px 12px",
-  fontSize: 12,
-  color: "#6b7280",
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: "10px 12px",
 };
