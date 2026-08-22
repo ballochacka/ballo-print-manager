@@ -37,12 +37,12 @@ export default function LeconsPage() {
   const telechargerFichier = async (file: File) => {
     const nomFichier = `\( {Date.now()}- \){file.name.replace(/\s/g, "_")}`;
     const { error } = await supabase.storage
-      .from("lecons")
+      .from("Lecons")
       .upload(nomFichier, file);
 
     if (error) throw error;
 
-    const { data } = supabase.storage.from("lecons").getPublicUrl(nomFichier);
+    const { data } = supabase.storage.from("Lecons").getPublicUrl(nomFichier);
     return data.publicUrl;
   };
 
