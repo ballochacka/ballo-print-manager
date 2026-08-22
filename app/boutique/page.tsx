@@ -27,60 +27,69 @@ export default function BoutiquePage() {
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [dernierEnvoi, setDernierEnvoi] = useState(0);
 
   const envoyerDemande = async () => {
-  if (!nom || !prenom || !telephone || !selectedProduit) {
-    alert("Merci de remplir tous les champs");
-    return;
-  }
+    const maintenant = Date.now();
+    if (maintenant - dernierEnvoi < 30000) {
+      alert("Patiente 30 secondes avant une nouvelle demande.");
+      return;
+    }
 
-  setLoading(true);
+    if (!nom || !prenom || !telephone || !selectedProduit) {
+      alert("Merci de remplir tous les champs");
+      return;
+    }
 
-  const clientNom = prenom + " " + nom;
-  const typeLabel = type === "devis" ? "Devis demandé" : "Commande web";
-  const messageNotif = clientNom + " (" + telephone + ") — " + selectedProduit;
+    setLoading(true);
 
-  const { error } = await supabase.from("commandes").insert([
-    {
-      numero: "WEB-" + Date.now().toString().slice(-5),
-      client: clientNom,
-      produit: selectedProduit,
-      quantite: 1,
-      statut: typeLabel,
-      montant: "À confirmer",
-    },
-  ]);
+    const clientNom = prenom + " " + nom;
+    const typeLabel = type === "devis" ? "Devis demandé" : "Commande web";
+    const messageNotif = clientNom + " (" + telephone + ") — " + selectedProduit;
 
-  if (error) {
+    const { error } = await supabase.from("commandes").insert([
+      {
+        numero: "WEB-" + Date.now().toString().slice(-5),
+        client: clientNom,
+        produit: selectedProduit,
+        quantite: 1,
+        statut: typeLabel,
+        montant: "À confirmer",
+      },
+    ]);
+
+    if (error) {
+      setLoading(false);
+      alert("Erreur lors de l'envoi. Réessaie.");
+      return;
+    }
+
+    await supabase.from("notifications").insert([
+      {
+        titre: typeLabel,
+        message: messageNotif,
+      },
+    ]);
+
+    const texteWhatsApp =
+      "Nouvelle " + typeLabel +
+      "%0AClient: " + clientNom +
+      "%0ATel: " + telephone +
+      "%0AProduit: " + selectedProduit +
+      "%0AMessage: " + (message || "Aucun");
+
+    window.open("https://wa.me/22375137083?text=" + texteWhatsApp, "_blank");
+
+    setDernierEnvoi(Date.now());
     setLoading(false);
-    alert("Erreur lors de l'envoi. Réessaie.");
-    return;
-  }
+    setSuccess(true);
+    setNom("");
+    setPrenom("");
+    setTelephone("");
+    setSelectedProduit("");
+    setMessage("");
+  };
 
-  await supabase.from("notifications").insert([
-    {
-      titre: typeLabel,
-      message: messageNotif,
-    },
-  ]);
-
-  const texteWhatsApp =
-    "Nouvelle " + typeLabel +
-    "%0AClient: " + clientNom +
-    "%0ATel: " + telephone +
-    "%0AProduit: " + selectedProduit +
-    "%0AMessage: " + (message || "Aucun");
-
-  window.open("https://wa.me/22375137083?text=" + texteWhatsApp, "_blank");
-
-  setLoading(false);
-  setSuccess(true);
-  setNom("");
-  setPrenom("");
-  setTelephone("");
-  setSelectedProduit("");
-  setMessage("");
-};
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f172a, #3b0764, #0f172a)", color: "white" }}>
       <header style={{ background: "linear-gradient(90deg, #7c3aed, #2563eb)", padding: "40px 16px", textAlign: "center" }}>
@@ -103,7 +112,15 @@ export default function BoutiquePage() {
                 <p style={{ margin: "10px 0", color: "#c4b5fd", fontWeight: 700 }}>{p.prix}</p>
                 <button
                   onClick={() => setSelectedProduit(p.nom)}
-                  style={{ width: "100%", background: selectedProduit === p.nom ? "#16a34a" : "#7c3aed", color: "white", border: "none", borderRadius: 10, padding: "10px 0", cursor: "pointer" }}
+                  style={{
+                    width: "100%",
+                    background: selectedProduit === p.nom ? "#16a34a" : "#7c3aed",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 10,
+                    padding: "10px 0",
+                    cursor: "pointer",
+                  }}
                 >
                   {selectedProduit === p.nom ? "Sélectionné" : "Choisir"}
                 </button>
@@ -121,17 +138,42 @@ export default function BoutiquePage() {
             <div style={{ textAlign: "center", padding: "24px 0" }}>
               <p style={{ color: "#4ade80", fontSize: 18, fontWeight: 600 }}>Demande envoyée avec succès !</p>
               <p style={{ color: "#cbd5e1", fontSize: 14 }}>Nous vous contacterons très bientôt.</p>
-              <button onClick={() => setSuccess(false)} style={{ marginTop: 12, background: "transparent", color: "#c4b5fd", border: "none", textDecoration: "underline", cursor: "pointer" }}>
+              <button
+                onClick={() => setSuccess(false)}
+                style={{ marginTop: 12, background: "transparent", color: "#c4b5fd", border: "none", textDecoration: "underline", cursor: "pointer" }}
+              >
                 Faire une autre demande
               </button>
             </div>
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => setType("commande")} style={{ flex: 1, padding: 10, borderRadius: 10, border: "none", cursor: "pointer", background: type === "commande" ? "#7c3aed" : "rgba(255,255,255,0.1)", color: "white" }}>
+                <button
+                  onClick={() => setType("commande")}
+                  style={{
+                    flex: 1,
+                    padding: 10,
+                    borderRadius: 10,
+                    border: "none",
+                    cursor: "pointer",
+                    background: type === "commande" ? "#7c3aed" : "rgba(255,255,255,0.1)",
+                    color: "white",
+                  }}
+                >
                   Commander
                 </button>
-                <button onClick={() => setType("devis")} style={{ flex: 1, padding: 10, borderRadius: 10, border: "none", cursor: "pointer", background: type === "devis" ? "#7c3aed" : "rgba(255,255,255,0.1)", color: "white" }}>
+                <button
+                  onClick={() => setType("devis")}
+                  style={{
+                    flex: 1,
+                    padding: 10,
+                    borderRadius: 10,
+                    border: "none",
+                    cursor: "pointer",
+                    background: type === "devis" ? "#7c3aed" : "rgba(255,255,255,0.1)",
+                    color: "white",
+                  }}
+                >
                   Demander un devis
                 </button>
               </div>
@@ -140,16 +182,39 @@ export default function BoutiquePage() {
               <input placeholder="Prénom" value={prenom} onChange={(e) => setPrenom(e.target.value)} style={inputStyle} />
               <input placeholder="Téléphone" value={telephone} onChange={(e) => setTelephone(e.target.value)} style={inputStyle} />
 
-              <select value={selectedProduit} onChange={(e) => setSelectedProduit(e.target.value)} style={{ ...inputStyle, background: "#1e293b" }}>
+              <select
+                value={selectedProduit}
+                onChange={(e) => setSelectedProduit(e.target.value)}
+                style={{ ...inputStyle, background: "#1e293b" }}
+              >
                 <option value="">Sélectionner un produit</option>
                 {produits.map((p) => (
-                  <option key={p.id} value={p.nom}>{p.nom} — {p.prix}</option>
+                  <option key={p.id} value={p.nom}>
+                    {p.nom} — {p.prix}
+                  </option>
                 ))}
               </select>
 
-              <textarea placeholder="Message (optionnel)" value={message} onChange={(e) => setMessage(e.target.value)} style={{ ...inputStyle, height: 90, resize: "vertical" }} />
+              <textarea
+                placeholder="Message (optionnel)"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                style={{ ...inputStyle, height: 90, resize: "vertical" }}
+              />
 
-              <button onClick={envoyerDemande} disabled={loading} style={{ background: "linear-gradient(90deg, #7c3aed, #2563eb)", color: "white", border: "none", borderRadius: 12, padding: 14, fontWeight: 600, cursor: "pointer" }}>
+              <button
+                onClick={envoyerDemande}
+                disabled={loading}
+                style={{
+                  background: "linear-gradient(90deg, #7c3aed, #2563eb)",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 12,
+                  padding: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
                 {loading ? "Envoi en cours..." : "Envoyer ma demande"}
               </button>
             </div>
