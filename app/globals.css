@@ -35,3 +35,21 @@ main, main * {
 table th, table td {
   color: #0f172a !important;
 }
+@media (max-width: 768px) {
+  table {
+    font-size: 12px;
+  }
+
+  th, td {
+    padding: 8px !important;
+    white-space: nowrap;
+  }
+
+  input, select, textarea, button {
+    font-size: 16px !important;
+  }
+
+  header {
+    gap: 8px;
+  }
+}

@@ -4,63 +4,59 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
 export default function EtiquettesPage() {
-  const [etiquettes, setEtiquettes] = useState<any[]>([]);
+  const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [message, setMessage] = useState("");
-  const PRIX_M2 = 4500;
-
   const [form, setForm] = useState({
     client: "",
     quantite: "1",
     largeur: "",
     hauteur: "",
+    prix_m2: "4500",
   });
 
   const charger = async () => {
     setLoading(true);
     const { data } = await supabase.from("etiquettes").select("*").order("created_at", { ascending: false });
-    setEtiquettes(data || []);
+    setRows(data || []);
     setLoading(false);
   };
 
-  useEffect(() => {
-    charger();
-  }, []);
+  useEffect(() => { charger(); }, []);
 
-  const largeurCm = Number(form.largeur) || 0;
-  const hauteurCm = Number(form.hauteur) || 0;
-  const quantite = Number(form.quantite) || 1;
-  const surfaceM2 = (largeurCm / 100) * (hauteurCm / 100);
-  const totalEstime = Math.round(surfaceM2 * PRIX_M2 * quantite);
+  const calculerTotal = () => {
+    const q = Number(form.quantite) || 1;
+    const l = Number(form.largeur) || 0;
+    const h = Number(form.hauteur) || 0;
+    const p = Number(form.prix_m2) || 4500;
+    const m2 = (l * h) / 10000;
+    return Math.round(q * m2 * p);
+  };
 
   const ajouter = async () => {
-    if (!form.client || !form.largeur || !form.hauteur) {
-      alert("Client, largeur et hauteur obligatoires");
+    if (!form.client) return alert("Client obligatoire");
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user) {
+      alert("Session expirée. Reconnecte-toi.");
+      window.location.href = "/login";
       return;
     }
 
-    const { error } = await supabase.from("etiquettes").insert([
-      {
-        client: form.client,
-        quantite,
-        largeur: largeurCm,
-        hauteur: hauteurCm,
-        prix_unitaire: PRIX_M2,
-        total: totalEstime,
-        statut: "En cours",
-      },
-    ]);
+    const total = calculerTotal();
+    const { error } = await supabase.from("etiquettes").insert([{
+      client: form.client,
+      quantite: Number(form.quantite) || 1,
+      largeur: Number(form.largeur) || 0,
+      hauteur: Number(form.hauteur) || 0,
+      prix_m2: Number(form.prix_m2) || 4500,
+      total,
+      owner_id: user.id,
+    }]);
 
-    if (error) {
-      alert("Erreur lors de l'ajout");
-      return;
-    }
-
-    setForm({ client: "", quantite: "1", largeur: "", hauteur: "" });
+    if (error) return alert("Erreur : " + error.message);
+    setForm({ client: "", quantite: "1", largeur: "", hauteur: "", prix_m2: "4500" });
     setShowForm(false);
-    setMessage("Étiquettes enregistrées");
-    setTimeout(() => setMessage(""), 3000);
     charger();
   };
 
@@ -70,80 +66,50 @@ export default function EtiquettesPage() {
     charger();
   };
 
-  const changerStatut = async (id: string, statut: string) => {
-    await supabase.from("etiquettes").update({ statut }).eq("id", id);
-    charger();
-  };
-
   return (
-    <div>
-      <header className="bg-white border-b px-4 md:px-6 py-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-800">Étiquettes</h2>
-        <button onClick={() => setShowForm(!showForm)} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm">
-          + Nouvelle commande
-        </button>
+    <div style={{ color: "#0f172a", background: "#f8fafc", minHeight: "100%" }}>
+      <header style={headerStyle}>
+        <h2 style={{ margin: 0, fontSize: 18 }}>Étiquettes</h2>
+        <button onClick={() => setShowForm(!showForm)} style={btnPrimary}>+ Nouvelle</button>
       </header>
 
-      <div className="p-4 md:p-6">
-        {message && <div className="mb-4 p-3 bg-green-100 text-green-800 rounded-lg text-sm">{message}</div>}
-
+      <div style={{ padding: 16 }}>
         {showForm && (
-          <div className="mb-6 bg-white rounded-xl border p-5">
-            <h3 className="font-semibold mb-4">Nouvelle commande d'étiquettes</h3>
-            <p className="text-xs text-gray-500 mb-4">Prix : 4 500 FCFA / m² — calcul automatique</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input placeholder="Nom du client" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
-              <input type="number" placeholder="Quantité" value={form.quantite} onChange={(e) => setForm({ ...form, quantite: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
-              <input type="number" placeholder="Largeur (cm)" value={form.largeur} onChange={(e) => setForm({ ...form, largeur: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
-              <input type="number" placeholder="Hauteur (cm)" value={form.hauteur} onChange={(e) => setForm({ ...form, hauteur: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
+          <div style={cardStyle}>
+            <div style={gridStyle}>
+              <input placeholder="Client" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} style={inputStyle} />
+              <input type="number" placeholder="Quantité" value={form.quantite} onChange={(e) => setForm({ ...form, quantite: e.target.value })} style={inputStyle} />
+              <input type="number" placeholder="Largeur (cm)" value={form.largeur} onChange={(e) => setForm({ ...form, largeur: e.target.value })} style={inputStyle} />
+              <input type="number" placeholder="Hauteur (cm)" value={form.hauteur} onChange={(e) => setForm({ ...form, hauteur: e.target.value })} style={inputStyle} />
+              <input type="number" placeholder="Prix / m²" value={form.prix_m2} onChange={(e) => setForm({ ...form, prix_m2: e.target.value })} style={inputStyle} />
             </div>
-            <div className="mt-4 p-3 bg-purple-50 rounded-lg text-sm">
-              <p>Surface : <strong>{surfaceM2.toFixed(4)} m²</strong></p>
-              <p className="text-purple-700 font-bold text-base mt-1">Total : {totalEstime.toLocaleString("fr-FR")} FCFA</p>
-            </div>
-            <div className="flex gap-3 mt-4">
-              <button onClick={ajouter} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm">Enregistrer</button>
-              <button onClick={() => setShowForm(false)} className="bg-gray-100 px-4 py-2 rounded-lg text-sm">Annuler</button>
+            <p style={{ marginTop: 10 }}>Total : <b style={{ color: "#7c3aed" }}>{calculerTotal().toLocaleString("fr-FR")} FCFA</b></p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={ajouter} style={btnPrimary}>Enregistrer</button>
+              <button onClick={() => setShowForm(false)} style={btnGray}>Annuler</button>
             </div>
           </div>
         )}
 
-        <div className="bg-white rounded-xl border overflow-hidden">
-          {loading ? (
-            <div className="p-8 text-center text-gray-500">Chargement...</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs text-gray-500">
-                  <tr>
-                    <th className="text-left px-4 py-3">Client</th>
-                    <th className="text-left px-4 py-3">Qté</th>
-                    <th className="text-left px-4 py-3">Dimensions</th>
-                    <th className="text-left px-4 py-3">Total</th>
-                    <th className="text-left px-4 py-3">Date</th>
-                    <th className="text-left px-4 py-3">Statut</th>
-                    <th className="text-left px-4 py-3">Actions</th>
+        <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+          {loading ? <div style={{ padding: 24, textAlign: "center" }}>Chargement...</div> :
+          rows.length === 0 ? <div style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>Aucune étiquette</div> : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "#f9fafb", textAlign: "left" }}>
+                    <th style={th}>Client</th><th style={th}>Qté</th><th style={th}>Taille</th><th style={th}>Total</th><th style={th}>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
-                  {etiquettes.map((e) => (
-                    <tr key={e.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium">{e.client}</td>
-                      <td className="px-4 py-3">{e.quantite}</td>
-                      <td className="px-4 py-3">{e.largeur} × {e.hauteur} cm</td>
-                      <td className="px-4 py-3 font-medium text-purple-700">{e.total?.toLocaleString()} FCFA</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">
-                        {e.created_at ? new Date(e.created_at).toLocaleDateString("fr-FR") : "—"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <select value={e.statut} onChange={(ev) => changerStatut(e.id, ev.target.value)} className="border rounded px-2 py-1 text-xs">
-                          <option value="En cours">En cours</option>
-                          <option value="Terminé">Terminé</option>
-                          <option value="Livré">Livré</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => supprimer(e.id)} className="text-xs bg-red-100 text-red-600 px-2.5 py-1 rounded">Supprimer</button>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                      <td style={td}><strong>{r.client}</strong></td>
+                      <td style={td}>{r.quantite}</td>
+                      <td style={td}>{r.largeur} × {r.hauteur} cm</td>
+                      <td style={{ ...td, color: "#059669", fontWeight: 600 }}>{(r.total || 0).toLocaleString("fr-FR")} FCFA</td>
+                      <td style={td}>
+                        <button onClick={() => supprimer(r.id)} style={btnDanger}>Supprimer</button>
                       </td>
                     </tr>
                   ))}
@@ -156,3 +122,13 @@ export default function EtiquettesPage() {
     </div>
   );
 }
+
+const headerStyle: React.CSSProperties = { background: "white", borderBottom: "1px solid #e5e7eb", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" };
+const cardStyle: React.CSSProperties = { marginBottom: 16, background: "white", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 };
+const gridStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 };
+const inputStyle: React.CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #d1d5db", boxSizing: "border-box" };
+const btnPrimary: React.CSSProperties = { background: "#7c3aed", color: "white", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" };
+const btnGray: React.CSSProperties = { background: "#f3f4f6", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" };
+const btnDanger: React.CSSProperties = { background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: 11 };
+const th: React.CSSProperties = { padding: "10px 12px", fontSize: 12, color: "#6b7280" };
+const td: React.CSSProperties = { padding: "10px 12px" };
