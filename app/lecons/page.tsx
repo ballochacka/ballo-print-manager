@@ -9,6 +9,7 @@ export default function LeconsPage() {
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [recherche, setRecherche] = useState("");
 
   const [form, setForm] = useState({
     titre: "",
@@ -111,16 +112,33 @@ export default function LeconsPage() {
     }
   };
 
+  const filtrées = lecons.filter((l) => {
+    const q = recherche.toLowerCase();
+    return (
+      (l.titre || "").toLowerCase().includes(q) ||
+      (l.matiere || "").toLowerCase().includes(q) ||
+      (l.description || "").toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div style={{ color: "#0f172a", background: "#f8fafc", minHeight: "100%" }}>
-      <header style={{ background: "white", borderBottom: "1px solid #e5e7eb", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <header style={{ background: "white", borderBottom: "1px solid #e5e7eb", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>Leçons</h2>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer" }}
-        >
-          + Nouvelle leçon
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            placeholder="Rechercher une leçon..."
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #d1d5db", minWidth: 180 }}
+          />
+          <button
+            onClick={() => setShowForm(!showForm)}
+            style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer" }}
+          >
+            + Nouvelle leçon
+          </button>
+        </div>
       </header>
 
       <div style={{ padding: 16 }}>
@@ -167,11 +185,11 @@ export default function LeconsPage() {
 
         {loading ? (
           <div style={{ padding: 24, textAlign: "center" }}>Chargement...</div>
-        ) : lecons.length === 0 ? (
-          <div style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>Aucune leçon enregistrée</div>
+        ) : filtrées.length === 0 ? (
+          <div style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>Aucune leçon trouvée</div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
-            {lecons.map((l) => {
+            {filtrées.map((l) => {
               const couleur = couleurs[l.matiere] || "#64748b";
               return (
                 <div
