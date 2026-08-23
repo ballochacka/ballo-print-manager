@@ -11,12 +11,17 @@ export default function MaillotsPage() {
 
   const [form, setForm] = useState({
     client: "",
-    type_maillot: "Maillot personnalisé avec rank",
-    apporte_par_client: true,
-    prix_maillot: "0",
-    prix_personnalisation: "2000",
+    type_maillot: "Maillot personnalisé DTF",
     quantite: "1",
+    prix_maillot: "0",
+    prix_perso: "2000",
   });
+
+  const types = [
+    "Maillot personnalisé DTF",
+    "Maillot personnalisé vinyle",
+    "Personnalisation seule (client apporte maillot)",
+  ];
 
   const charger = async () => {
     setLoading(true);
@@ -29,42 +34,55 @@ export default function MaillotsPage() {
     charger();
   }, []);
 
+  const totalLigne = () => {
+    const qte = Number(form.quantite) || 1;
+    const prixMaillot = Number(form.prix_maillot) || 0;
+    const prixPerso = Number(form.prix_perso) || 0;
+    return qte * (prixMaillot + prixPerso);
+  };
+
   const ajouter = async () => {
     if (!form.client) {
-      alert("Le nom du client est obligatoire");
+      alert("Nom du client obligatoire");
       return;
     }
 
-    const prixMaillot = form.apporte_par_client ? 0 : Number(form.prix_maillot) || 0;
-    const prixPerso = Number(form.prix_personnalisation) || 0;
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user) {
+      alert("Session expirée. Reconnecte-toi.");
+      window.location.href = "/login";
+      return;
+    }
+
     const quantite = Number(form.quantite) || 1;
-    const total = (prixMaillot + prixPerso) * quantite;
+    const prix_maillot = Number(form.prix_maillot) || 0;
+    const prix_perso = Number(form.prix_perso) || 0;
+    const total = quantite * (prix_maillot + prix_perso);
 
     const { error } = await supabase.from("maillots").insert([
       {
         client: form.client,
         type_maillot: form.type_maillot,
-        apporte_par_client: form.apporte_par_client,
-        prix_maillot: prixMaillot,
-        prix_personnalisation: prixPerso,
         quantite,
+        prix_maillot,
+        prix_perso,
         total,
-        statut: "En cours",
+        owner_id: user.id,
       },
     ]);
 
     if (error) {
-      alert("Erreur lors de l'ajout");
+      alert("Erreur : " + error.message);
       return;
     }
 
     setForm({
       client: "",
-      type_maillot: "Maillot personnalisé avec rank",
-      apporte_par_client: true,
-      prix_maillot: "0",
-      prix_personnalisation: "2000",
+      type_maillot: "Maillot personnalisé DTF",
       quantite: "1",
+      prix_maillot: "0",
+      prix_perso: "2000",
     });
     setShowForm(false);
     setMessage("Maillot enregistré");
@@ -78,97 +96,82 @@ export default function MaillotsPage() {
     charger();
   };
 
-  const changerStatut = async (id: string, statut: string) => {
-    await supabase.from("maillots").update({ statut }).eq("id", id);
-    charger();
-  };
-
   return (
-    <div>
-      <header className="bg-white border-b px-4 md:px-6 py-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-800">Maillots / Personnalisation</h2>
-        <button onClick={() => setShowForm(!showForm)} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm">
+    <div style={{ color: "#0f172a", background: "#f8fafc", minHeight: "100%" }}>
+      <header style={{ background: "white", borderBottom: "1px solid #e5e7eb", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h2 style={{ margin: 0, fontSize: 18 }}>Maillots</h2>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer" }}
+        >
           + Nouveau
         </button>
       </header>
 
-      <div className="p-4 md:p-6">
-        {message && <div className="mb-4 p-3 bg-green-100 text-green-800 rounded-lg text-sm">{message}</div>}
+      <div style={{ padding: 16 }}>
+        {message && (
+          <div style={{ marginBottom: 12, padding: 12, background: "#dcfce7", color: "#166534", borderRadius: 10 }}>
+            {message}
+          </div>
+        )}
 
         {showForm && (
-          <div className="mb-6 bg-white rounded-xl border p-5">
-            <h3 className="font-semibold mb-4">Nouvelle personnalisation</h3>
-            <div className="space-y-4">
-              <input placeholder="Nom du client" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
-              <select value={form.type_maillot} onChange={(e) => setForm({ ...form, type_maillot: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm">
-                <option value="Maillot personnalisé avec rank">Maillot personnalisé avec rank</option>
-                <option value="Maillot personnalisé avec vinyle">Maillot personnalisé avec vinyle</option>
-                <option value="Maillot personnalisé avec DTF">Maillot personnalisé avec DTF</option>
+          <div style={{ marginBottom: 16, background: "white", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+              <input placeholder="Nom client" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} style={inputStyle} />
+              <select value={form.type_maillot} onChange={(e) => setForm({ ...form, type_maillot: e.target.value })} style={inputStyle}>
+                {types.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
               </select>
-              <div className="flex gap-4 text-sm">
-                <label className="flex items-center gap-2">
-                  <input type="radio" checked={form.apporte_par_client === true} onChange={() => setForm({ ...form, apporte_par_client: true, prix_maillot: "0" })} />
-                  Client apporte son maillot
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="radio" checked={form.apporte_par_client === false} onChange={() => setForm({ ...form, apporte_par_client: false })} />
-                  Je fournis le maillot
-                </label>
-              </div>
-              {!form.apporte_par_client && (
-                <input type="number" placeholder="Prix du maillot (FCFA)" value={form.prix_maillot} onChange={(e) => setForm({ ...form, prix_maillot: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
-              )}
-              <input type="number" placeholder="Prix personnalisation (FCFA)" value={form.prix_personnalisation} onChange={(e) => setForm({ ...form, prix_personnalisation: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
-              <input type="number" placeholder="Quantité" value={form.quantite} onChange={(e) => setForm({ ...form, quantite: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
-              <div className="text-sm text-purple-700 font-medium">
-                Total estimé : {(((form.apporte_par_client ? 0 : Number(form.prix_maillot) || 0) + (Number(form.prix_personnalisation) || 0)) * (Number(form.quantite) || 1)).toLocaleString()} FCFA
-              </div>
+              <input type="number" placeholder="Quantité" value={form.quantite} onChange={(e) => setForm({ ...form, quantite: e.target.value })} style={inputStyle} />
+              <input type="number" placeholder="Prix maillot (0 si client apporte)" value={form.prix_maillot} onChange={(e) => setForm({ ...form, prix_maillot: e.target.value })} style={inputStyle} />
+              <input type="number" placeholder="Prix personnalisation" value={form.prix_perso} onChange={(e) => setForm({ ...form, prix_perso: e.target.value })} style={inputStyle} />
             </div>
-            <div className="flex gap-3 mt-4">
-              <button onClick={ajouter} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm">Enregistrer</button>
-              <button onClick={() => setShowForm(false)} className="bg-gray-100 px-4 py-2 rounded-lg text-sm">Annuler</button>
+            <div style={{ marginTop: 10, fontSize: 14 }}>
+              Total : <strong style={{ color: "#7c3aed" }}>{totalLigne().toLocaleString("fr-FR")} FCFA</strong>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button onClick={ajouter} style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>
+                Enregistrer
+              </button>
+              <button onClick={() => setShowForm(false)} style={{ background: "#f3f4f6", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>
+                Annuler
+              </button>
             </div>
           </div>
         )}
 
-        <div className="bg-white rounded-xl border overflow-hidden">
+        <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
           {loading ? (
-            <div className="p-8 text-center text-gray-500">Chargement...</div>
+            <div style={{ padding: 24, textAlign: "center" }}>Chargement...</div>
+          ) : maillots.length === 0 ? (
+            <div style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>Aucun maillot</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs text-gray-500">
-                  <tr>
-                    <th className="text-left px-4 py-3">Client</th>
-                    <th className="text-left px-4 py-3">Type</th>
-                    <th className="text-left px-4 py-3">Apporté</th>
-                    <th className="text-left px-4 py-3">Qté</th>
-                    <th className="text-left px-4 py-3">Total</th>
-                    <th className="text-left px-4 py-3">Date</th>
-                    <th className="text-left px-4 py-3">Statut</th>
-                    <th className="text-left px-4 py-3">Actions</th>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "#f9fafb", textAlign: "left" }}>
+                    <th style={th}>Client</th>
+                    <th style={th}>Type</th>
+                    <th style={th}>Qté</th>
+                    <th style={th}>Total</th>
+                    <th style={th}>Date</th>
+                    <th style={th}>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody>
                   {maillots.map((m) => (
-                    <tr key={m.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium">{m.client}</td>
-                      <td className="px-4 py-3">{m.type_maillot}</td>
-                      <td className="px-4 py-3">{m.apporte_par_client ? "Client" : "Fourni"}</td>
-                      <td className="px-4 py-3">{m.quantite}</td>
-                      <td className="px-4 py-3 font-medium text-purple-700">{m.total?.toLocaleString()} FCFA</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">
-                        {m.created_at ? new Date(m.created_at).toLocaleDateString("fr-FR") : "—"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <select value={m.statut} onChange={(e) => changerStatut(m.id, e.target.value)} className="border rounded px-2 py-1 text-xs">
-                          <option value="En cours">En cours</option>
-                          <option value="Terminé">Terminé</option>
-                          <option value="Livré">Livré</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => supprimer(m.id)} className="text-xs bg-red-100 text-red-600 px-2.5 py-1 rounded">Supprimer</button>
+                    <tr key={m.id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                      <td style={td}><strong>{m.client}</strong></td>
+                      <td style={td}>{m.type_maillot}</td>
+                      <td style={td}>{m.quantite}</td>
+                      <td style={{ ...td, color: "#059669", fontWeight: 600 }}>{(m.total || 0).toLocaleString("fr-FR")} FCFA</td>
+                      <td style={td}>{m.created_at ? new Date(m.created_at).toLocaleDateString("fr-FR") : "—"}</td>
+                      <td style={td}>
+                        <button onClick={() => supprimer(m.id)} style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: 11 }}>
+                          Supprimer
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -181,3 +184,21 @@ export default function MaillotsPage() {
     </div>
   );
 }
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "10px 12px",
+  borderRadius: 8,
+  border: "1px solid #d1d5db",
+  boxSizing: "border-box",
+};
+
+const th: React.CSSProperties = {
+  padding: "10px 12px",
+  fontSize: 12,
+  color: "#6b7280",
+};
+
+const td: React.CSSProperties = {
+  padding: "10px 12px",
+};

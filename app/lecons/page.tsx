@@ -32,10 +32,7 @@ export default function LeconsPage() {
 
   const charger = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("lecons")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const { data } = await supabase.from("lecons").select("*").order("created_at", { ascending: false });
     setLecons(data || []);
     setLoading(false);
   };
@@ -48,10 +45,7 @@ export default function LeconsPage() {
     const nomPropre = file.name.replace(/\s/g, "_").replace(/[^\w.\-]/g, "");
     const nomFichier = Date.now() + "-" + nomPropre;
 
-    const { error } = await supabase.storage
-      .from("Lecons")
-      .upload(nomFichier, file);
-
+    const { error } = await supabase.storage.from("Lecons").upload(nomFichier, file);
     if (error) throw error;
 
     const { data } = supabase.storage.from("Lecons").getPublicUrl(nomFichier);
@@ -61,6 +55,14 @@ export default function LeconsPage() {
   const ajouter = async () => {
     if (!form.titre) {
       alert("Le titre est obligatoire");
+      return;
+    }
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user) {
+      alert("Session expirée. Reconnecte-toi.");
+      window.location.href = "/login";
       return;
     }
 
@@ -79,6 +81,7 @@ export default function LeconsPage() {
           description: form.description,
           duree: form.duree,
           fichier_url,
+          owner_id: user.id,
         },
       ]);
 
@@ -192,95 +195,28 @@ export default function LeconsPage() {
             {filtrées.map((l) => {
               const couleur = couleurs[l.matiere] || "#64748b";
               return (
-                <div
-                  key={l.id}
-                  style={{
-                    background: "white",
-                    borderRadius: 16,
-                    border: "1px solid #e5e7eb",
-                    overflow: "hidden",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
-                    display: "flex",
-                    flexDirection: "column",
-                  }}
-                >
-                  <div
-                    style={{
-                      height: 110,
-                      background: couleur,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "white",
-                      fontSize: 28,
-                      fontWeight: 700,
-                    }}
-                  >
+                <div key={l.id} style={{ background: "white", borderRadius: 16, border: "1px solid #e5e7eb", overflow: "hidden", boxShadow: "0 4px 12px rgba(0,0,0,0.06)", display: "flex", flexDirection: "column" }}>
+                  <div style={{ height: 110, background: couleur, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 28, fontWeight: 700 }}>
                     {l.matiere}
                   </div>
-
                   <div style={{ padding: 14, flex: 1, display: "flex", flexDirection: "column" }}>
                     <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>{l.titre}</h3>
-                    <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
-                      Durée : {l.duree || "—"}
-                    </p>
-                    {l.description && (
-                      <p style={{ margin: "8px 0 0", fontSize: 12, color: "#64748b" }}>
-                        {l.description}
-                      </p>
-                    )}
-
+                    <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>Durée : {l.duree || "—"}</p>
+                    {l.description && <p style={{ margin: "8px 0 0", fontSize: 12, color: "#64748b" }}>{l.description}</p>}
                     <div style={{ marginTop: "auto", paddingTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {l.fichier_url ? (
                         <>
-                          <a
-                            href={l.fichier_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{
-                              background: "#dbeafe",
-                              color: "#1d4ed8",
-                              textDecoration: "none",
-                              borderRadius: 8,
-                              padding: "6px 10px",
-                              fontSize: 12,
-                              fontWeight: 600,
-                            }}
-                          >
+                          <a href={l.fichier_url} target="_blank" rel="noreferrer" style={{ background: "#dbeafe", color: "#1d4ed8", textDecoration: "none", borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 600 }}>
                             📄 Voir PDF
                           </a>
-                          <button
-                            onClick={() => imprimer(l.fichier_url)}
-                            style={{
-                              background: "#f3e8ff",
-                              color: "#7c3aed",
-                              border: "none",
-                              borderRadius: 8,
-                              padding: "6px 10px",
-                              fontSize: 12,
-                              cursor: "pointer",
-                              fontWeight: 600,
-                            }}
-                          >
+                          <button onClick={() => imprimer(l.fichier_url)} style={{ background: "#f3e8ff", color: "#7c3aed", border: "none", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
                             🖨️ Imprimer
                           </button>
                         </>
                       ) : (
                         <span style={{ fontSize: 12, color: "#9ca3af" }}>Pas de PDF</span>
                       )}
-                      <button
-                        onClick={() => supprimer(l.id)}
-                        style={{
-                          background: "#fee2e2",
-                          color: "#dc2626",
-                          border: "none",
-                          borderRadius: 8,
-                          padding: "6px 10px",
-                          fontSize: 12,
-                          cursor: "pointer",
-                          marginLeft: "auto",
-                        }}
-                      >
+                      <button onClick={() => supprimer(l.id)} style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", marginLeft: "auto" }}>
                         Supprimer
                       </button>
                     </div>
