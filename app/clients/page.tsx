@@ -20,22 +20,36 @@ export default function ClientsPage() {
   useEffect(() => { charger(); }, []);
 
   const ajouter = async () => {
-    if (!form.nom) return alert("Le nom est obligatoire");
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert("Tu n'es pas connecté");
+  if (!form.nom) {
+    alert("Le nom est obligatoire");
+    return;
+  }
 
-    const { error } = await supabase.from("clients").insert([{
-      nom: form.nom,
-      telephone: form.telephone,
-      email: form.email,
-      owner_id: user.id,
-    }]);
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user;
 
-    if (error) return alert("Erreur : " + error.message);
-    setForm({ nom: "", telephone: "", email: "" });
-    setShowForm(false);
-    charger();
-  };
+  if (!user) {
+    alert("Session expirée. Reconnecte-toi.");
+    window.location.href = "/login";
+    return;
+  }
+
+  const { error } = await supabase.from("clients").insert([{
+    nom: form.nom,
+    telephone: form.telephone,
+    email: form.email,
+    owner_id: user.id,
+  }]);
+
+  if (error) {
+    alert("Erreur : " + error.message);
+    return;
+  }
+
+  setForm({ nom: "", telephone: "", email: "" });
+  setShowForm(false);
+  charger();
+};
 
   const supprimer = async (id: string) => {
     if (!confirm("Supprimer ce client ?")) return;
