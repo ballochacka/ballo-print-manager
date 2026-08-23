@@ -14,7 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router = useRouter();
 
-  const emailsAdmin = ["moussachackaballo@gmail.com"];
+  const emailsAdmin = ["admin@ballo.com","moussachackaballo@gmail.com"];
 
   useEffect(() => {
     const verifier = async () => {
