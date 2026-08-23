@@ -71,18 +71,199 @@ export default function CommandesPage() {
   };
 
   const imprimerRecu = (c: any) => {
-    const w = window.open("", "_blank");
-    if (!w) return;
-    w.document.write(`<html><head><title>Reçu</title></head><body style="font-family:Arial;padding:24px">
-      <h1>Ballo Print</h1>
-      <p>N° ${c.numero || ""}</p>
-      <p>Client : ${c.client}</p>
-      <p>Produit : ${c.produit}</p>
-      <p>Quantité : ${c.quantite || 1}</p>
-      <p><b>Total : ${c.montant} FCFA</b></p>
-      <script>window.print()</script></body></html>`);
-    w.document.close();
-  };
+  const w = window.open("", "_blank");
+  if (!w) return;
+
+  const date = c.created_at
+    ? new Date(c.created_at).toLocaleString("fr-FR")
+    : new Date().toLocaleString("fr-FR");
+
+  const total = c.montant || "0";
+
+  w.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Reçu ${c.numero || ""}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f3f4f6;
+      color: #0f172a;
+    }
+    .page {
+      width: 80mm;
+      max-width: 100%;
+      margin: 16px auto;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+    .header {
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      color: white;
+      text-align: center;
+      padding: 18px 14px 14px;
+    }
+    .logo {
+      width: 54px;
+      height: 54px;
+      margin: 0 auto 8px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.18);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 800;
+      border: 2px solid rgba(255,255,255,0.35);
+    }
+    .brand {
+      font-size: 20px;
+      font-weight: 800;
+      margin: 0;
+    }
+    .sub {
+      margin: 4px 0 0;
+      font-size: 11px;
+      opacity: 0.9;
+    }
+    .content { padding: 16px; }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 8px 0;
+      font-size: 13px;
+    }
+    .label { color: #64748b; }
+    .value { font-weight: 600; text-align: right; }
+    .divider {
+      border: none;
+      border-top: 1px dashed #d1d5db;
+      margin: 14px 0;
+    }
+    .total-box {
+      background: #f5f3ff;
+      border: 1px solid #ddd6fe;
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+    }
+    .total-label {
+      font-size: 12px;
+      color: #6d28d9;
+      margin: 0 0 4px;
+    }
+    .total-value {
+      font-size: 22px;
+      font-weight: 800;
+      color: #5b21b6;
+      margin: 0;
+    }
+    .footer {
+      padding: 14px 16px 18px;
+      text-align: center;
+      background: #f8fafc;
+      border-top: 1px solid #e5e7eb;
+    }
+    .thanks {
+      font-size: 12px;
+      color: #334155;
+      margin: 0 0 10px;
+    }
+    .sign-box {
+      margin: 12px auto 0;
+      width: 70%;
+      border-top: 1px solid #94a3b8;
+      padding-top: 6px;
+      font-size: 11px;
+      color: #64748b;
+    }
+    .contact {
+      margin-top: 10px;
+      font-size: 10px;
+      color: #94a3b8;
+    }
+    @media print {
+      body { background: white; }
+      .page {
+        margin: 0;
+        box-shadow: none;
+        border-radius: 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div class="logo">B</div>
+      <p class="brand">Ballo Print</p>
+      <p class="sub">Impression & Personnalisation</p>
+    </div>
+
+    <div class="content">
+      <div class="row">
+        <span class="label">Reçu N°</span>
+        <span class="value">${c.numero || "—"}</span>
+      </div>
+      <div class="row">
+        <span class="label">Date</span>
+        <span class="value">${date}</span>
+      </div>
+      <div class="row">
+        <span class="label">Client</span>
+        <span class="value">${c.client || "—"}</span>
+      </div>
+
+      <hr class="divider" />
+
+      <div class="row">
+        <span class="label">Produit</span>
+        <span class="value">${c.produit || "—"}</span>
+      </div>
+      <div class="row">
+        <span class="label">Quantité</span>
+        <span class="value">${c.quantite || 1}</span>
+      </div>
+      <div class="row">
+        <span class="label">Statut</span>
+        <span class="value">${c.statut || "—"}</span>
+      </div>
+
+      <hr class="divider" />
+
+      <div class="total-box">
+        <p class="total-label">Total à payer</p>
+        <p class="total-value">${total} FCFA</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p class="thanks">Merci pour votre confiance.</p>
+      <div class="sign-box">Signature / Cachet</div>
+      <div class="contact">
+        Ballo Print Manager<br/>
+        WhatsApp : +223 75 13 70 83
+      </div>
+    </div>
+  </div>
+  <script>
+    window.onload = function() {
+      window.print();
+    }
+  </script>
+</body>
+</html>
+  `);
+  w.document.close();
+};
 
   const filtrées = commandes.filter((c) => {
     const q = recherche.toLowerCase();
