@@ -14,18 +14,58 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router = useRouter();
 
+  const emailsAdmin = ["moussachackaballo@gmail.com"];
+
   useEffect(() => {
-    const checkUser = async () => {
+    const verifier = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setLoading(false);
-      if (!session && pathname !== "/login" && pathname !== "/boutique") {
-        router.push("/login");
+
+      if (pathname === "/login" || pathname === "/boutique" || pathname === "/abonnement-expire") {
+        setLoading(false);
+        return;
       }
+
+      if (!session) {
+        setLoading(false);
+        router.push("/login");
+        return;
+      }
+
+      const email = session.user.email || "";
+
+      // Admin jamais bloqué
+      if (emailsAdmin.includes(email)) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: abos } = await supabase
+        .from("abonnements")
+        .select("*")
+        .eq("email", email)
+        .eq("actif", true)
+        .order("date_fin", { ascending: false })
+        .limit(1);
+
+      const abo = abos?.[0];
+      const aujourdhui = new Date();
+      aujourdhui.setHours(0, 0, 0, 0);
+
+      const valide = abo && abo.date_fin && new Date(abo.date_fin) >= aujourdhui;
+
+      if (!valide) {
+        setLoading(false);
+        router.push("/abonnement-expire");
+        return;
+      }
+
+      setLoading(false);
     };
-    checkUser();
+
+    verifier();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session && pathname !== "/login" && pathname !== "/boutique") {
+      if (!session && pathname !== "/login" && pathname !== "/boutique" && pathname !== "/abonnement-expire") {
         router.push("/login");
       }
     });
@@ -47,7 +87,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   };
 
   useEffect(() => {
-    if (pathname === "/login" || pathname === "/boutique") return;
+    if (pathname === "/login" || pathname === "/boutique" || pathname === "/abonnement-expire") return;
     chargerNotifications();
     const interval = setInterval(chargerNotifications, 15000);
     return () => clearInterval(interval);
@@ -65,7 +105,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     router.push("/login");
   };
 
-  if (pathname === "/login" || pathname === "/boutique") {
+  if (pathname === "/login" || pathname === "/boutique" || pathname === "/abonnement-expire") {
     return (
       <html lang="fr">
         <head>
@@ -105,27 +145,34 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#7c3aed" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
       <body style={{ margin: 0, background: "#0f172a", color: "#e2e8f0" }}>
         <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
           {menuOpen && (
-            <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 40 }} />
+            <div
+              onClick={() => setMenuOpen(false)}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 40 }}
+            />
           )}
 
-          <aside style={{
-            width: 260,
-            background: "#020617",
-            borderRight: "1px solid rgba(255,255,255,0.08)",
-            display: "flex",
-            flexDirection: "column",
-            position: "fixed",
-            top: 0,
-            bottom: 0,
-            left: 0,
-            zIndex: 50,
-            transform: menuOpen ? "translateX(0)" : undefined,
-          }} className="sidebar">
+          <aside
+            style={{
+              width: 260,
+              background: "#020617",
+              borderRight: "1px solid rgba(255,255,255,0.08)",
+              display: "flex",
+              flexDirection: "column",
+              position: "fixed",
+              top: 0,
+              bottom: 0,
+              left: 0,
+              zIndex: 50,
+              transform: menuOpen ? "translateX(0)" : undefined,
+            }}
+            className="sidebar"
+          >
             <div style={{ padding: 18, borderBottom: "1px solid rgba(255,255,255,0.08)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <div style={{ width: 36, height: 36, borderRadius: 12, background: "linear-gradient(135deg,#8b5cf6,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>
@@ -136,7 +183,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <div style={{ fontSize: 10, color: "#94a3b8" }}>Manager</div>
                 </div>
               </div>
-              <button onClick={() => setMenuOpen(false)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 18, display: "pointer" }} className="close-mobile">
+              <button
+                onClick={() => setMenuOpen(false)}
+                style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 18, cursor: "pointer" }}
+                className="close-mobile"
+              >
                 ✕
               </button>
             </div>
@@ -150,25 +201,40 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/etiquettes" style={linkStyle("/etiquettes")}>Étiquettes</Link>
               <Link href="/wifi" style={linkStyle("/wifi")}>WiFi Zone</Link>
               <Link href="/formation" style={linkStyle("/formation")}>Formation</Link>
+              <Link href="/lecons" style={linkStyle("/lecons")}>Leçons</Link>
               <Link href="/production" style={linkStyle("/production")}>Production</Link>
               <Link href="/facturation" style={linkStyle("/facturation")}>Facturation</Link>
+              <Link href="/depenses" style={linkStyle("/depenses")}>Dépenses</Link>
               <Link href="/rapports" style={linkStyle("/rapports")}>Rapports</Link>
+              <Link href="/abonnements" style={linkStyle("/abonnements")}>Abonnements</Link>
               <Link href="/boutique" style={linkStyle("/boutique")}>Boutique</Link>
-           <Link href="/depenses" style={linkStyle("/depenses")}>Dépenses</Link>
-            <Link href="/lecons" style={linkStyle("/lecons")}>Leçons</Link>
-            <Link href="/abonnements" style={linkStyle("/abonnements")}>Abonnements</Link>
             </nav>
 
             <div style={{ padding: 12, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-              <button onClick={handleLogout} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", color: "#f87171", padding: 10, borderRadius: 8, cursor: "pointer" }}>
+              <button
+                onClick={handleLogout}
+                style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", color: "#f87171", padding: 10, borderRadius: 8, cursor: "pointer" }}
+              >
                 Déconnexion
               </button>
             </div>
           </aside>
 
-          <main style={{ flex: 1, marginLeft: 260, minHeight: "100vh", background: "linear-gradient(135deg, #0f172a, #3b0764, #0f172a)" }} className="main-content">
+          <main
+            style={{
+              flex: 1,
+              marginLeft: 260,
+              minHeight: "100vh",
+              background: "linear-gradient(135deg, #0f172a, #3b0764, #0f172a)",
+            }}
+            className="main-content"
+          >
             <div style={{ height: 52, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", background: "linear-gradient(90deg,#7c3aed,#2563eb)", position: "relative" }}>
-              <button onClick={() => setMenuOpen(true)} style={{ background: "none", border: "none", color: "white", fontSize: 24, cursor: "pointer" }} className="open-mobile">
+              <button
+                onClick={() => setMenuOpen(true)}
+                style={{ background: "none", border: "none", color: "white", fontSize: 24, cursor: "pointer" }}
+                className="open-mobile"
+              >
                 ☰
               </button>
 
@@ -222,10 +288,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             .sidebar {
               transform: translateX(-110%);
             }
-            .sidebar[style*="translateX(0)"],
-            .sidebar.open {
-              transform: translateX(0) !important;
-            }
             .main-content {
               margin-left: 0 !important;
             }
@@ -233,6 +295,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           @media (min-width: 769px) {
             .open-mobile, .close-mobile {
               display: none !important;
+            }
+            .sidebar {
+              transform: translateX(0) !important;
             }
           }
         `}</style>
