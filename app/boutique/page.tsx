@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+const OWNER_ADMIN = "8b9ad9fa-689a-45a1-9171-fcc4dc035a52";
+
 const produits = [
   { id: 1, nom: "T-shirt simple personnalisé", prix: "2 000 FCFA", description: "T-shirt simple avec personnalisation", emoji: "👕", couleur: "#3b82f6" },
   { id: 2, nom: "T-shirt lourd personnalisé", prix: "2 500 - 3 000 FCFA", description: "T-shirt lourd avec personnalisation", emoji: "👕", couleur: "#6366f1" },
@@ -55,12 +57,14 @@ export default function BoutiquePage() {
         quantite: 1,
         statut: typeLabel,
         montant: "À confirmer",
+        owner_id: OWNER_ADMIN,
       },
     ]);
 
     if (error) {
       setLoading(false);
       alert("Erreur lors de l'envoi. Réessaie.");
+      console.error(error);
       return;
     }
 
@@ -68,6 +72,7 @@ export default function BoutiquePage() {
       {
         titre: typeLabel,
         message: messageNotif,
+        owner_id: OWNER_ADMIN,
       },
     ]);
 
