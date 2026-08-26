@@ -6,18 +6,90 @@ import { supabase } from "@/lib/supabase";
 const OWNER_ADMIN = "8b9ad9fa-689a-45a1-9171-fcc4dc035a52";
 
 const produits = [
-  { id: 1, nom: "T-shirt simple personnalisé", prix: "2 000 FCFA", description: "T-shirt simple avec personnalisation", emoji: "👕", couleur: "#3b82f6" },
-  { id: 2, nom: "T-shirt lourd personnalisé", prix: "2 500 - 3 000 FCFA", description: "T-shirt lourd avec personnalisation", emoji: "👕", couleur: "#6366f1" },
-  { id: 3, nom: "T-shirt très lourd personnalisé", prix: "4 000 FCFA", description: "T-shirt très lourd personnalisé", emoji: "👕", couleur: "#8b5cf6" },
-  { id: 4, nom: "Lacoste simple", prix: "2 500 FCFA", description: "Lacoste simple personnalisé", emoji: "🧥", couleur: "#0ea5e9" },
-  { id: 5, nom: "Lacoste très lourd", prix: "5 000 FCFA", description: "Lacoste très lourd personnalisé", emoji: "🧥", couleur: "#06b6d4" },
-  { id: 6, nom: "Bol personnalisé", prix: "2 500 FCFA / unité", description: "Bol avec personnalisation", emoji: "🥣", couleur: "#f59e0b" },
-  { id: 7, nom: "Pochette personnalisée", prix: "5 000 FCFA", description: "Pochette personnalisée", emoji: "👜", couleur: "#ef4444" },
-  { id: 8, nom: "Casquette personnalisée", prix: "2 500 FCFA", description: "Casquette avec personnalisation", emoji: "🧢", couleur: "#22c55e" },
-  { id: 9, nom: "Porte-clé", prix: "1 500 FCFA", description: "Porte-clé personnalisé", emoji: "🔑", couleur: "#a855f7" },
-  { id: 10, nom: "Impression une face", prix: "1 000 FCFA", description: "Impression simple une face", emoji: "🖨️", couleur: "#64748b" },
-  { id: 11, nom: "Impression double face", prix: "Sur devis", description: "Impression recto-verso", emoji: "🖨️", couleur: "#475569" },
-  { id: 12, nom: "Flyers / Brochures / Étiquettes / Bâche", prix: "3 500 FCFA / m²", description: "Grand format et supports publicitaires", emoji: "📄", couleur: "#dc2626" },
+  {
+    id: 1,
+    nom: "T-shirt simple personnalisé",
+    prix: "2 000 FCFA",
+    description: "T-shirt simple avec personnalisation",
+    image: "/produits/tshirt-simple.jpg",
+  },
+  {
+    id: 2,
+    nom: "T-shirt lourd personnalisé",
+    prix: "2 500 - 3 000 FCFA",
+    description: "T-shirt lourd avec personnalisation",
+    image: "/produits/tshirt-lourd.jpg",
+  },
+  {
+    id: 3,
+    nom: "T-shirt très lourd personnalisé",
+    prix: "4 000 FCFA",
+    description: "T-shirt très lourd personnalisé",
+    image: "/produits/tshirt-tres-lourd.jpg",
+  },
+  {
+    id: 4,
+    nom: "Lacoste simple",
+    prix: "2 500 FCFA",
+    description: "Lacoste simple personnalisé",
+    image: "/produits/lacoste-simple.jpg",
+  },
+  {
+    id: 5,
+    nom: "Lacoste très lourd",
+    prix: "5 000 FCFA",
+    description: "Lacoste très lourd personnalisé",
+    image: "/produits/lacoste-lourd.jpg",
+  },
+  {
+    id: 6,
+    nom: "Bol personnalisé",
+    prix: "2 500 FCFA / unité",
+    description: "Bol avec personnalisation",
+    image: "/produits/bol.jpg",
+  },
+  {
+    id: 7,
+    nom: "Pochette personnalisée",
+    prix: "5 000 FCFA",
+    description: "Pochette personnalisée",
+    image: "/produits/pochette.jpg",
+  },
+  {
+    id: 8,
+    nom: "Casquette personnalisée",
+    prix: "2 500 FCFA",
+    description: "Casquette avec personnalisation",
+    image: "/produits/casquette.jpg",
+  },
+  {
+    id: 9,
+    nom: "Porte-clé",
+    prix: "1 500 FCFA",
+    description: "Porte-clé personnalisé",
+    image: "/produits/porte-cle.jpg",
+  },
+  {
+    id: 10,
+    nom: "Impression une face",
+    prix: "1 000 FCFA",
+    description: "Impression simple une face",
+    image: "/produits/impression-1-face.jpg",
+  },
+  {
+    id: 11,
+    nom: "Impression double face",
+    prix: "Sur devis",
+    description: "Impression recto-verso",
+    image: "/produits/impression-2-faces.jpg",
+  },
+  {
+    id: 12,
+    nom: "Affiches / Kakémonos / Étiquettes",
+    prix: "3 500 FCFA / m²",
+    description: "Affiches, kakémonos et étiquettes sur devis au mètre carré",
+    image: "/produits/affiches-kakemonos-etiquettes.jpg",
+  },
 ];
 
 export default function BoutiquePage() {
@@ -88,20 +160,22 @@ export default function BoutiquePage() {
       },
     ]);
 
-    const texteWhatsApp =
-      "Nouvelle " + typeLabel +
-      "%0AClient: " + clientNom +
-      "%0ATel: " + telephone +
-      "%0AProduit: " + selectedProduit +
-      "%0AMessage: " + (message || "Aucun");
-
-    window.open("https://wa.me/22375137083?text=" + encodeURIComponent(
-      "Nouvelle " + typeLabel +
-      "\nClient: " + clientNom +
-      "\nTel: " + telephone +
-      "\nProduit: " + selectedProduit +
-      "\nMessage: " + (message || "Aucun")
-    ), "_blank");
+    window.open(
+      "https://wa.me/22375137083?text=" +
+        encodeURIComponent(
+          "Nouvelle " +
+            typeLabel +
+            "\nClient: " +
+            clientNom +
+            "\nTel: " +
+            telephone +
+            "\nProduit: " +
+            selectedProduit +
+            "\nMessage: " +
+            (message || "Aucun")
+        ),
+      "_blank"
+    );
 
     setDernierEnvoi(Date.now());
     setLoading(false);
@@ -125,10 +199,32 @@ export default function BoutiquePage() {
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 40 }}>
           {produits.map((p) => (
-            <div key={p.id} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, overflow: "hidden" }}>
-              <div style={{ height: 120, background: p.couleur, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 48 }}>
-                {p.emoji}
+            <div
+              key={p.id}
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 18,
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ height: 170, background: "#1e293b", overflow: "hidden" }}>
+                <img
+                  src={p.image}
+                  alt={p.nom}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      "https://images.unsplash.com/photo-1521572163474-6854f5bf50ac?w=600&q=80";
+                  }}
+                />
               </div>
+
               <div style={{ padding: 16 }}>
                 <h3 style={{ margin: "0 0 6px", fontSize: 16 }}>{p.nom}</h3>
                 <p style={{ margin: 0, color: "#cbd5e1", fontSize: 13 }}>{p.description}</p>
