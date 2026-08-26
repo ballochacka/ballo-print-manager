@@ -31,6 +31,9 @@ export default function BoutiquePage() {
   const [loading, setLoading] = useState(false);
   const [dernierEnvoi, setDernierEnvoi] = useState(0);
 
+  const nettoyerTelephone = (valeur: string) => valeur.replace(/[^\d+]/g, "");
+  const nettoyerNom = (valeur: string) => valeur.replace(/[^a-zA-ZÀ-ÿ\s\-']/g, "");
+
   const envoyerDemande = async () => {
     const maintenant = Date.now();
     if (maintenant - dernierEnvoi < 30000) {
@@ -38,14 +41,24 @@ export default function BoutiquePage() {
       return;
     }
 
-    if (!nom || !prenom || !telephone || !selectedProduit) {
-      alert("Merci de remplir tous les champs");
+    if (!nom.trim() || !prenom.trim()) {
+      alert("Nom et prénom sont obligatoires");
+      return;
+    }
+
+    if (telephone.replace(/\D/g, "").length < 8) {
+      alert("Le téléphone doit contenir au moins 8 chiffres");
+      return;
+    }
+
+    if (!selectedProduit) {
+      alert("Sélectionne un produit");
       return;
     }
 
     setLoading(true);
 
-    const clientNom = prenom + " " + nom;
+    const clientNom = prenom.trim() + " " + nom.trim();
     const typeLabel = type === "devis" ? "Devis demandé" : "Commande web";
     const messageNotif = clientNom + " (" + telephone + ") — " + selectedProduit;
 
@@ -64,7 +77,6 @@ export default function BoutiquePage() {
     if (error) {
       setLoading(false);
       alert("Erreur lors de l'envoi. Réessaie.");
-      console.error(error);
       return;
     }
 
@@ -83,7 +95,13 @@ export default function BoutiquePage() {
       "%0AProduit: " + selectedProduit +
       "%0AMessage: " + (message || "Aucun");
 
-    window.open("https://wa.me/22375137083?text=" + texteWhatsApp, "_blank");
+    window.open("https://wa.me/22375137083?text=" + encodeURIComponent(
+      "Nouvelle " + typeLabel +
+      "\nClient: " + clientNom +
+      "\nTel: " + telephone +
+      "\nProduit: " + selectedProduit +
+      "\nMessage: " + (message || "Aucun")
+    ), "_blank");
 
     setDernierEnvoi(Date.now());
     setLoading(false);
@@ -183,9 +201,25 @@ export default function BoutiquePage() {
                 </button>
               </div>
 
-              <input placeholder="Nom" value={nom} onChange={(e) => setNom(e.target.value)} style={inputStyle} />
-              <input placeholder="Prénom" value={prenom} onChange={(e) => setPrenom(e.target.value)} style={inputStyle} />
-              <input placeholder="Téléphone" value={telephone} onChange={(e) => setTelephone(e.target.value)} style={inputStyle} />
+              <input
+                placeholder="Nom *"
+                value={nom}
+                onChange={(e) => setNom(nettoyerNom(e.target.value))}
+                style={inputStyle}
+              />
+              <input
+                placeholder="Prénom *"
+                value={prenom}
+                onChange={(e) => setPrenom(nettoyerNom(e.target.value))}
+                style={inputStyle}
+              />
+              <input
+                placeholder="Téléphone * (chiffres uniquement)"
+                value={telephone}
+                onChange={(e) => setTelephone(nettoyerTelephone(e.target.value))}
+                inputMode="tel"
+                style={inputStyle}
+              />
 
               <select
                 value={selectedProduit}
@@ -203,7 +237,7 @@ export default function BoutiquePage() {
               <textarea
                 placeholder="Message (optionnel)"
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={(e) => setMessage(e.target.value.slice(0, 300))}
                 style={{ ...inputStyle, height: 90, resize: "vertical" }}
               />
 
