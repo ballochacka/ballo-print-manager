@@ -11,10 +11,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotif, setShowNotif] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
-  const emailsAdmin = ["admin@ballo.com","moussachackaballo@gmail.com"];
+  const emailsAdmin = ["admin@ballo.com", "moussachackaballo@gmail.com"];
 
   useEffect(() => {
     const verifier = async () => {
@@ -32,8 +33,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       }
 
       const email = session.user.email || "";
+      setIsAdmin(emailsAdmin.includes(email));
 
-      // Admin jamais bloqué
+      // Admin jamais bloqué par abonnement
       if (emailsAdmin.includes(email)) {
         setLoading(false);
         return;
@@ -206,7 +208,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/facturation" style={linkStyle("/facturation")}>Facturation</Link>
               <Link href="/depenses" style={linkStyle("/depenses")}>Dépenses</Link>
               <Link href="/rapports" style={linkStyle("/rapports")}>Rapports</Link>
-              <Link href="/abonnements" style={linkStyle("/abonnements")}>Abonnements</Link>
+              {isAdmin && (
+                <Link href="/abonnements" style={linkStyle("/abonnements")}>Abonnements</Link>
+              )}
               <Link href="/boutique" style={linkStyle("/boutique")}>Boutique</Link>
             </nav>
 
