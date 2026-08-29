@@ -15,14 +15,14 @@ export default function RapportsPage() {
     maillotsAchat: 0,
     maillotsBenefice: 0,
     maillotsNb: 0,
-    formationsCA: 0,
-    formationsNb: 0,
     etiquettesCA: 0,
     etiquettesNb: 0,
+    formationsCA: 0,
+    formationsNb: 0,
     wifiCA: 0,
+    wifiNb: 0,
     wifiCout: 16000,
     wifiBenefice: 0,
-    wifiNb: 0,
     depensesTotal: 0,
     depensesNb: 0,
   });
@@ -64,16 +64,16 @@ export default function RapportsPage() {
         maillotsNb += 1;
       });
 
-      let formationsCA = 0, formationsNb = 0;
-      (eleves || []).filter((e: any) => dansMois(e.created_at)).forEach((e: any) => {
-        formationsCA += e.total_paye || 0;
-        formationsNb += 1;
-      });
-
       let etiquettesCA = 0, etiquettesNb = 0;
       (etiquettes || []).filter((e: any) => dansMois(e.created_at)).forEach((e: any) => {
         etiquettesCA += e.total || 0;
         etiquettesNb += 1;
+      });
+
+      let formationsCA = 0, formationsNb = 0;
+      (eleves || []).filter((e: any) => dansMois(e.created_at)).forEach((e: any) => {
+        formationsCA += e.total_paye || 0;
+        formationsNb += 1;
       });
 
       let wifiCA = 0, wifiNb = 0;
@@ -82,13 +82,17 @@ export default function RapportsPage() {
         wifiNb += 1;
       });
 
+      // Coût fixe WiFi : uniquement dans la partie WiFi
+      const wifiCout = 16000;
+      const wifiBenefice = wifiCA - wifiCout;
+
       let depensesTotal = 0, depensesNb = 0;
       (depenses || []).filter((d: any) => dansMois(d.created_at)).forEach((d: any) => {
         depensesTotal += d.montant || 0;
         depensesNb += 1;
       });
 
-      // Graphique par jour du mois
+      // Graphique = impression seulement (pas WiFi, pas formation)
       const map: Record<string, number> = {};
       const ajouterJour = (dateStr: string | null, montant: number) => {
         if (!dateStr || !dansMois(dateStr)) return;
@@ -106,10 +110,7 @@ export default function RapportsPage() {
       (maillots || []).forEach((m: any) => {
         ajouterJour(m.created_at, (m.total || 0) - (m.prix_maillot || 0) * (m.quantite || 1));
       });
-      (eleves || []).forEach((e: any) => ajouterJour(e.created_at, e.total_paye || 0));
       (etiquettes || []).forEach((e: any) => ajouterJour(e.created_at, e.total || 0));
-      (wifi || []).forEach((w: any) => ajouterJour(w.created_at, w.prix || 0));
-      (depenses || []).forEach((d: any) => ajouterJour(d.created_at, -(d.montant || 0)));
 
       const evo = Object.entries(map)
         .map(([jour, benefice]) => ({ jour, benefice }))
@@ -128,14 +129,14 @@ export default function RapportsPage() {
         maillotsAchat,
         maillotsBenefice: maillotsCA - maillotsAchat,
         maillotsNb,
-        formationsCA,
-        formationsNb,
         etiquettesCA,
         etiquettesNb,
+        formationsCA,
+        formationsNb,
         wifiCA,
-        wifiCout: 16000,
-        wifiBenefice: wifiCA - 16000,
         wifiNb,
+        wifiCout,
+        wifiBenefice,
         depensesTotal,
         depensesNb,
       });
@@ -146,20 +147,12 @@ export default function RapportsPage() {
     charger();
   }, [mois]);
 
-  const totalCA =
-    stats.commandesCA + stats.maillotsCA + stats.formationsCA + stats.etiquettesCA + stats.wifiCA;
-  const totalAchat =
-    stats.commandesAchat + stats.maillotsAchat + stats.wifiCout + stats.depensesTotal;
-  const totalBenefice =
-    stats.commandesBenefice +
-    stats.maillotsBenefice +
-    stats.formationsCA +
-    stats.etiquettesCA +
-    stats.wifiBenefice -
-    stats.depensesTotal;
+  // TOTAL PRINCIPAL = impression seulement (le 16000 WiFi n'est PAS dedans)
+  const totalCA = stats.commandesCA + stats.maillotsCA + stats.etiquettesCA;
+  const totalAchat = stats.commandesAchat + stats.maillotsAchat;
+  const totalBenefice = stats.commandesBenefice + stats.maillotsBenefice + stats.etiquettesCA;
 
   const maxBenef = Math.max(...evolution.map((e) => Math.abs(e.benefice)), 1);
-
   const labelMois = new Date(mois + "-01").toLocaleDateString("fr-FR", {
     month: "long",
     year: "numeric",
@@ -196,23 +189,22 @@ export default function RapportsPage() {
           <>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 20 }}>
               <div style={{ background: "linear-gradient(135deg,#2563eb,#1d4ed8)", color: "white", borderRadius: 16, padding: 18 }}>
-                <div style={{ fontSize: 13, opacity: 0.9 }}>Chiffre d'affaires</div>
+                <div style={{ fontSize: 13, opacity: 0.9 }}>CA Impression</div>
                 <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6 }}>{totalCA.toLocaleString("fr-FR")} FCFA</div>
               </div>
               <div style={{ background: "linear-gradient(135deg,#f97316,#ea580c)", color: "white", borderRadius: 16, padding: 18 }}>
-                <div style={{ fontSize: 13, opacity: 0.9 }}>Achats + dépenses</div>
+                <div style={{ fontSize: 13, opacity: 0.9 }}>Achats matériaux</div>
                 <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6 }}>{totalAchat.toLocaleString("fr-FR")} FCFA</div>
               </div>
               <div style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "white", borderRadius: 16, padding: 18 }}>
-                <div style={{ fontSize: 13, opacity: 0.9 }}>Bénéfice net</div>
+                <div style={{ fontSize: 13, opacity: 0.9 }}>Bénéfice impression</div>
                 <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6 }}>{totalBenefice.toLocaleString("fr-FR")} FCFA</div>
               </div>
             </div>
 
-            {/* Graphique */}
             <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, marginBottom: 20 }}>
-              <h3 style={{ marginTop: 0 }}>Évolution des bénéfices</h3>
-              <p style={{ marginTop: -6, color: "#6b7280", fontSize: 12 }}>Par jour sur le mois sélectionné</p>
+              <h3 style={{ marginTop: 0 }}>Évolution bénéfice impression</h3>
+              <p style={{ marginTop: -6, color: "#6b7280", fontSize: 12 }}>Commandes + Maillots + Étiquettes</p>
 
               {evolution.length === 0 ? (
                 <p style={{ textAlign: "center", color: "#9ca3af", padding: 30 }}>Pas de données pour ce mois</p>
@@ -246,24 +238,59 @@ export default function RapportsPage() {
               )}
             </div>
 
-            {/* Détails */}
+            <h3 style={{ marginBottom: 10 }}>Détail par activité</h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-              {[
-                ["Commandes", stats.commandesNb, stats.commandesCA, stats.commandesAchat, stats.commandesBenefice],
-                ["Maillots", stats.maillotsNb, stats.maillotsCA, stats.maillotsAchat, stats.maillotsBenefice],
-                ["Formations", stats.formationsNb, stats.formationsCA, 0, stats.formationsCA],
-                ["Étiquettes", stats.etiquettesNb, stats.etiquettesCA, 0, stats.etiquettesCA],
-                ["WiFi Zone", stats.wifiNb, stats.wifiCA, stats.wifiCout, stats.wifiBenefice],
-                ["Dépenses", stats.depensesNb, 0, stats.depensesTotal, -stats.depensesTotal],
-              ].map(([titre, nb, ca, achat, benef]) => (
-                <div key={String(titre)} style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14 }}>
-                  <h3 style={{ marginTop: 0 }}>{titre}</h3>
-                  <p style={{ margin: "4px 0" }}>Nombre : {nb as number}</p>
-                  <p style={{ margin: "4px 0" }}>CA : <b style={{ color: "#2563eb" }}>{(ca as number).toLocaleString("fr-FR")} FCFA</b></p>
-                  <p style={{ margin: "4px 0" }}>Coûts : <b style={{ color: "#ea580c" }}>{(achat as number).toLocaleString("fr-FR")} FCFA</b></p>
-                  <p style={{ margin: "4px 0" }}>Bénéfice : <b style={{ color: (benef as number) >= 0 ? "#059669" : "#dc2626" }}>{(benef as number).toLocaleString("fr-FR")} FCFA</b></p>
-                </div>
-              ))}
+              <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14 }}>
+                <h3 style={{ marginTop: 0 }}>Commandes</h3>
+                <p style={{ margin: "4px 0" }}>Nombre : {stats.commandesNb}</p>
+                <p style={{ margin: "4px 0" }}>CA : <b style={{ color: "#2563eb" }}>{stats.commandesCA.toLocaleString("fr-FR")} FCFA</b></p>
+                <p style={{ margin: "4px 0" }}>Coûts : <b style={{ color: "#ea580c" }}>{stats.commandesAchat.toLocaleString("fr-FR")} FCFA</b></p>
+                <p style={{ margin: "4px 0" }}>Bénéfice : <b style={{ color: "#059669" }}>{stats.commandesBenefice.toLocaleString("fr-FR")} FCFA</b></p>
+              </div>
+
+              <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14 }}>
+                <h3 style={{ marginTop: 0 }}>Maillots</h3>
+                <p style={{ margin: "4px 0" }}>Nombre : {stats.maillotsNb}</p>
+                <p style={{ margin: "4px 0" }}>CA : <b style={{ color: "#2563eb" }}>{stats.maillotsCA.toLocaleString("fr-FR")} FCFA</b></p>
+                <p style={{ margin: "4px 0" }}>Coûts : <b style={{ color: "#ea580c" }}>{stats.maillotsAchat.toLocaleString("fr-FR")} FCFA</b></p>
+                <p style={{ margin: "4px 0" }}>Bénéfice : <b style={{ color: "#059669" }}>{stats.maillotsBenefice.toLocaleString("fr-FR")} FCFA</b></p>
+              </div>
+
+              <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14 }}>
+                <h3 style={{ marginTop: 0 }}>Étiquettes</h3>
+                <p style={{ margin: "4px 0" }}>Nombre : {stats.etiquettesNb}</p>
+                <p style={{ margin: "4px 0" }}>CA : <b style={{ color: "#2563eb" }}>{stats.etiquettesCA.toLocaleString("fr-FR")} FCFA</b></p>
+                <p style={{ margin: "4px 0" }}>Bénéfice : <b style={{ color: "#059669" }}>{stats.etiquettesCA.toLocaleString("fr-FR")} FCFA</b></p>
+              </div>
+
+              <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 14, padding: 14 }}>
+                <h3 style={{ marginTop: 0 }}>Formations</h3>
+                <p style={{ margin: "4px 0" }}>Élèves : {stats.formationsNb}</p>
+                <p style={{ margin: "4px 0" }}>Encaissé : <b style={{ color: "#7c3aed" }}>{stats.formationsCA.toLocaleString("fr-FR")} FCFA</b></p>
+              </div>
+
+              {/* WIFI : le 16000 est UNIQUEMENT ici */}
+              <div style={{ background: "#ecfeff", border: "2px solid #06b6d4", borderRadius: 14, padding: 14 }}>
+                <h3 style={{ marginTop: 0 }}>WiFi Zone / Diffusion</h3>
+                <p style={{ margin: "4px 0" }}>Ventes : {stats.wifiNb}</p>
+                <p style={{ margin: "4px 0" }}>CA WiFi : <b style={{ color: "#0891b2" }}>{stats.wifiCA.toLocaleString("fr-FR")} FCFA</b></p>
+                <p style={{ margin: "4px 0" }}>Coût mensuel : <b style={{ color: "#ea580c" }}>{stats.wifiCout.toLocaleString("fr-FR")} FCFA</b></p>
+                <p style={{ margin: "4px 0" }}>
+                  Bénéfice WiFi :{" "}
+                  <b style={{ color: stats.wifiBenefice >= 0 ? "#059669" : "#dc2626" }}>
+                    {stats.wifiBenefice.toLocaleString("fr-FR")} FCFA
+                  </b>
+                </p>
+                <p style={{ margin: "6px 0 0", fontSize: 11, color: "#64748b" }}>
+                  Le 16 000 FCFA est calculé seulement ici, pas sur les commandes.
+                </p>
+              </div>
+
+              <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 14, padding: 14 }}>
+                <h3 style={{ marginTop: 0 }}>Dépenses</h3>
+                <p style={{ margin: "4px 0" }}>Nombre : {stats.depensesNb}</p>
+                <p style={{ margin: "4px 0" }}>Total : <b style={{ color: "#ea580c" }}>{stats.depensesTotal.toLocaleString("fr-FR")} FCFA</b></p>
+              </div>
             </div>
           </>
         )}
