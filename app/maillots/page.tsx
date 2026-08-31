@@ -25,7 +25,10 @@ export default function MaillotsPage() {
 
   const charger = async () => {
     setLoading(true);
-    const { data } = await supabase.from("maillots").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase
+      .from("maillots")
+      .select("*")
+      .order("created_at", { ascending: false });
     setMaillots(data || []);
     setLoading(false);
   };
@@ -98,11 +101,27 @@ export default function MaillotsPage() {
 
   return (
     <div style={{ color: "#0f172a", background: "#f8fafc", minHeight: "100%" }}>
-      <header style={{ background: "white", borderBottom: "1px solid #e5e7eb", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <header
+        style={{
+          background: "white",
+          borderBottom: "1px solid #e5e7eb",
+          padding: "12px 16px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <h2 style={{ margin: 0, fontSize: 18 }}>Maillots</h2>
         <button
           onClick={() => setShowForm(!showForm)}
-          style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer" }}
+          style={{
+            background: "#7c3aed",
+            color: "white",
+            border: "none",
+            borderRadius: 10,
+            padding: "8px 14px",
+            cursor: "pointer",
+          }}
         >
           + Nouveau
         </button>
@@ -110,43 +129,125 @@ export default function MaillotsPage() {
 
       <div style={{ padding: 16 }}>
         {message && (
-          <div style={{ marginBottom: 12, padding: 12, background: "#dcfce7", color: "#166534", borderRadius: 10 }}>
+          <div
+            style={{
+              marginBottom: 12,
+              padding: 12,
+              background: "#dcfce7",
+              color: "#166534",
+              borderRadius: 10,
+            }}
+          >
             {message}
           </div>
         )}
 
         {showForm && (
-          <div style={{ marginBottom: 16, background: "white", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-              <input placeholder="Nom client" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} style={inputStyle} />
-              <select value={form.type_maillot} onChange={(e) => setForm({ ...form, type_maillot: e.target.value })} style={inputStyle}>
+          <div
+            style={{
+              marginBottom: 16,
+              background: "white",
+              border: "1px solid #e5e7eb",
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 10,
+              }}
+            >
+              <input
+                placeholder="Nom client"
+                value={form.client}
+                onChange={(e) => setForm({ ...form, client: e.target.value })}
+                style={inputStyle}
+              />
+              <select
+                value={form.type_maillot}
+                onChange={(e) => setForm({ ...form, type_maillot: e.target.value })}
+                style={inputStyle}
+              >
                 {types.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
                 ))}
               </select>
-              <input type="number" placeholder="Quantité" value={form.quantite} onChange={(e) => setForm({ ...form, quantite: e.target.value })} style={inputStyle} />
-              <input type="number" placeholder="Prix maillot (0 si client apporte)" value={form.prix_maillot} onChange={(e) => setForm({ ...form, prix_maillot: e.target.value })} style={inputStyle} />
-              <input type="number" placeholder="Prix personnalisation" value={form.prix_perso} onChange={(e) => setForm({ ...form, prix_perso: e.target.value })} style={inputStyle} />
+              <input
+                type="number"
+                placeholder="Quantité"
+                value={form.quantite}
+                onChange={(e) => setForm({ ...form, quantite: e.target.value })}
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                placeholder="Prix maillot (0 si client apporte)"
+                value={form.prix_maillot}
+                onChange={(e) => setForm({ ...form, prix_maillot: e.target.value })}
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                placeholder="Prix personnalisation"
+                value={form.prix_perso}
+                onChange={(e) => setForm({ ...form, prix_perso: e.target.value })}
+                style={inputStyle}
+              />
             </div>
             <div style={{ marginTop: 10, fontSize: 14 }}>
-              Total : <strong style={{ color: "#7c3aed" }}>{totalLigne().toLocaleString("fr-FR")} FCFA</strong>
+              Total :{" "}
+              <strong style={{ color: "#7c3aed" }}>
+                {totalLigne().toLocaleString("fr-FR")} FCFA
+              </strong>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              <button onClick={ajouter} style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>
+              <button
+                onClick={ajouter}
+                style={{
+                  background: "#7c3aed",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "8px 14px",
+                  cursor: "pointer",
+                }}
+              >
                 Enregistrer
               </button>
-              <button onClick={() => setShowForm(false)} style={{ background: "#f3f4f6", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>
+              <button
+                onClick={() => setShowForm(false)}
+                style={{
+                  background: "#f3f4f6",
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "8px 14px",
+                  cursor: "pointer",
+                }}
+              >
                 Annuler
               </button>
             </div>
           </div>
         )}
 
-        <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
+        <div
+          style={{
+            background: "white",
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            overflow: "hidden",
+          }}
+        >
           {loading ? (
             <div style={{ padding: 24, textAlign: "center" }}>Chargement...</div>
           ) : maillots.length === 0 ? (
-            <div style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>Aucun maillot</div>
+            <div style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>
+              Aucun maillot
+            </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -163,13 +264,32 @@ export default function MaillotsPage() {
                 <tbody>
                   {maillots.map((m) => (
                     <tr key={m.id} style={{ borderTop: "1px solid #f3f4f6" }}>
-                      <td style={td}><strong>{m.client}</strong></td>
+                      <td style={td}>
+                        <strong>{m.client}</strong>
+                      </td>
                       <td style={td}>{m.type_maillot}</td>
                       <td style={td}>{m.quantite}</td>
-                      <td style={{ ...td, color: "#059669", fontWeight: 600 }}>{(m.total || 0).toLocaleString("fr-FR")} FCFA</td>
-                      <td style={td}>{m.created_at ? new Date(m.created_at).toLocaleDateString("fr-FR") : "—"}</td>
+                      <td style={{ ...td, color: "#059669", fontWeight: 600 }}>
+                        {(m.total || 0).toLocaleString("fr-FR")} FCFA
+                      </td>
                       <td style={td}>
-                        <button onClick={() => supprimer(m.id)} style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: 11 }}>
+                        {m.created_at
+                          ? new Date(m.created_at).toLocaleDateString("fr-FR")
+                          : "—"}
+                      </td>
+                      <td style={td}>
+                        <button
+                          onClick={() => supprimer(m.id)}
+                          style={{
+                            background: "#fee2e2",
+                            color: "#dc2626",
+                            border: "none",
+                            borderRadius: 6,
+                            padding: "4px 8px",
+                            cursor: "pointer",
+                            fontSize: 11,
+                          }}
+                        >
                           Supprimer
                         </button>
                       </td>
