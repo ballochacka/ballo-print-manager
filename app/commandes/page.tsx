@@ -20,19 +20,25 @@ export default function CommandesPage() {
   const qte = Number(form.quantite) || 0;
   const prixVenteUnit = Number(form.prix_unitaire) || 0;
   const prixAchatUnit = Number(form.prix_achat_unitaire) || 0;
-
   const totalVente = qte * prixVenteUnit;
   const totalAchat = qte * prixAchatUnit;
   const benefice = totalVente - totalAchat;
+
+  const nomProduit = (s: any) =>
+    s.produit || s.nom || s.name || s.designation || "Sans nom";
+
+  const qteStock = (s: any) =>
+    Number(s.quantite ?? s.qte ?? s.stock ?? 0);
 
   const charger = async () => {
     setLoading(true);
     const [{ data: commandes }, { data: clientsData }, { data: stocksData }] =
       await Promise.all([
         supabase.from("commandes").select("*").order("created_at", { ascending: false }),
-        supabase.from("clients").select("*").order("nom"),
-        supabase.from("stocks").select("*").order("produit"),
+        supabase.from("clients").select("*"),
+        supabase.from("stocks").select("*"),
       ]);
+
     setRows(commandes || []);
     setClients(clientsData || []);
     setStocks(stocksData || []);
@@ -42,6 +48,9 @@ export default function CommandesPage() {
   useEffect(() => {
     charger();
   }, []);
+
+  const trouverStock = (nom: string) =>
+    stocks.find((s) => nomProduit(s).toLowerCase() === (nom || "").toLowerCase());
 
   const ajouter = async () => {
     if (!form.client || !form.produit) {
@@ -55,6 +64,15 @@ export default function CommandesPage() {
     if (prixVenteUnit <= 0) {
       alert("Prix de vente unitaire obligatoire");
       return;
+    }
+
+    const stockItem = trouverStock(form.produit);
+    if (stockItem) {
+      const dispo = qteStock(stockItem);
+      if (dispo < qte) {
+        alert(`Stock insuffisant. Disponible : ${dispo}`);
+        return;
+      }
     }
 
     const {
@@ -79,8 +97,25 @@ export default function CommandesPage() {
     ]);
 
     if (error) {
-      alert("Erreur : " + error.message);
+      alert("Erreur commande : " + error.message);
       return;
+    }
+
+    // Diminuer le stock
+    if (stockItem) {
+      const nouvelleQte = qteStock(stockItem) - qte;
+      const { error: stockErr } = await supabase
+        .from("stocks")
+        .update({ quantite: nouvelleQte })
+        .eq("id", stockItem.id);
+
+      if (stockErr) {
+        // si la colonne s'appelle autrement
+        await supabase
+          .from("stocks")
+          .update({ qte: nouvelleQte })
+          .eq("id", stockItem.id);
+      }
     }
 
     setForm({
@@ -94,11 +129,33 @@ export default function CommandesPage() {
     charger();
   };
 
-  const supprimer = async (id: string) => {
-    if (!confirm("Supprimer cette commande ?")) return;
-    await supabase.from("commandes").delete().eq("id", id);
+  const supprimer = async (commande: any) => {
+    if (!confirm("Supprimer cette commande ? Le stock sera remis.")) return;
+
+    // Remettre le stock
+    const stockItem = trouverStock(commande.produit);
+    if (stockItem) {
+      const retour = Number(commande.quantite) || 0;
+      const nouvelleQte = qteStock(stockItem) + retour;
+      const { error: stockErr } = await supabase
+        .from("stocks")
+        .update({ quantite: nouvelleQte })
+        .eq("id", stockItem.id);
+
+      if (stockErr) {
+        await supabase
+          .from("stocks")
+          .update({ qte: nouvelleQte })
+          .eq("id", stockItem.id);
+      }
+    }
+
+    await supabase.from("commandes").delete().eq("id", commande.id);
     charger();
   };
+
+  const nomClient = (c: any) =>
+    c.nom || c.nom_complet || c.name || c.client || "Client";
 
   return (
     <div style={{ color: "#0f172a", background: "#f8fafc", minHeight: "100%" }}>
@@ -155,8 +212,8 @@ export default function CommandesPage() {
               >
                 <option value="">— Client —</option>
                 {clients.map((c) => (
-                  <option key={c.id} value={c.nom || c.nom_complet || c.name}>
-                    {c.nom || c.nom_complet || c.name}
+                  <option key={c.id} value={nomClient(c)}>
+                    {nomClient(c)}
                   </option>
                 ))}
               </select>
@@ -167,11 +224,17 @@ export default function CommandesPage() {
                 style={inputStyle}
               >
                 <option value="">— Produit —</option>
-                {stocks.map((s) => (
-                  <option key={s.id} value={s.produit || s.nom}>
-                    {s.produit || s.nom}
+                {stocks.length === 0 ? (
+                  <option value="" disabled>
+                    Aucun produit en stock
                   </option>
-                ))}
+                ) : (
+                  stocks.map((s) => (
+                    <option key={s.id} value={nomProduit(s)}>
+                      {nomProduit(s)} (stock: {qteStock(s)})
+                    </option>
+                  ))
+                )}
               </select>
 
               <input
@@ -182,7 +245,6 @@ export default function CommandesPage() {
                 onChange={(e) => setForm({ ...form, quantite: e.target.value })}
                 style={inputStyle}
               />
-
               <input
                 type="number"
                 min="0"
@@ -191,7 +253,6 @@ export default function CommandesPage() {
                 onChange={(e) => setForm({ ...form, prix_unitaire: e.target.value })}
                 style={inputStyle}
               />
-
               <input
                 type="number"
                 min="0"
@@ -217,21 +278,13 @@ export default function CommandesPage() {
                 <div style={{ fontWeight: 700, color: "#2563eb", fontSize: 16 }}>
                   {totalVente.toLocaleString("fr-FR")} FCFA
                 </div>
-                <div style={{ fontSize: 11, color: "#64748b" }}>
-                  {qte} × {prixVenteUnit.toLocaleString("fr-FR")}
-                </div>
               </div>
-
               <div style={{ background: "#fff7ed", borderRadius: 10, padding: 12 }}>
                 <div style={{ fontSize: 12, color: "#9a3412" }}>Total achat</div>
                 <div style={{ fontWeight: 700, color: "#ea580c", fontSize: 16 }}>
                   {totalAchat.toLocaleString("fr-FR")} FCFA
                 </div>
-                <div style={{ fontSize: 11, color: "#64748b" }}>
-                  {qte} × {prixAchatUnit.toLocaleString("fr-FR")}
-                </div>
               </div>
-
               <div style={{ background: "#ecfdf5", borderRadius: 10, padding: 12 }}>
                 <div style={{ fontSize: 12, color: "#065f46" }}>Bénéfice</div>
                 <div
@@ -243,7 +296,6 @@ export default function CommandesPage() {
                 >
                   {benefice.toLocaleString("fr-FR")} FCFA
                 </div>
-                <div style={{ fontSize: 11, color: "#64748b" }}>vente − achat</div>
               </div>
             </div>
 
@@ -334,7 +386,7 @@ export default function CommandesPage() {
                         </td>
                         <td style={td}>
                           <button
-                            onClick={() => supprimer(r.id)}
+                            onClick={() => supprimer(r)}
                             style={{
                               background: "#fee2e2",
                               color: "#dc2626",
