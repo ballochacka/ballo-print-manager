@@ -1,300 +1,289 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+
+function n(v: any) {
+  return Number(v) || 0;
+}
 
 export default function RapportsPage() {
   const [loading, setLoading] = useState(true);
-  const [mois, setMois] = useState(new Date().toISOString().slice(0, 7));
-  const [stats, setStats] = useState({
-    commandesCA: 0,
-    commandesAchat: 0,
-    commandesBenefice: 0,
-    commandesNb: 0,
-    maillotsCA: 0,
-    maillotsAchat: 0,
-    maillotsBenefice: 0,
-    maillotsNb: 0,
-    etiquettesCA: 0,
-    etiquettesNb: 0,
-    formationsCA: 0,
-    formationsNb: 0,
-    wifiCA: 0,
-    wifiNb: 0,
-    wifiCout: 16000,
-    wifiBenefice: 0,
-    depensesTotal: 0,
-    depensesNb: 0,
-  });
-  const [evolution, setEvolution] = useState<{ jour: string; benefice: number }[]>([]);
+  const [dateDebut, setDateDebut] = useState("");
+  const [dateFin, setDateFin] = useState("");
+
+  const [cmd, setCmd] = useState({ ca: 0, achat: 0, benef: 0 });
+  const [maillots, setMaillots] = useState({ ca: 0, achat: 0, benef: 0 });
+  const [etiquettes, setEtiquettes] = useState({ ca: 0, achat: 0, benef: 0 });
+  const [business, setBusiness] = useState({ ca: 0, achat: 0, benef: 0 });
+  const [formation, setFormation] = useState({ ca: 0, benef: 0 });
+
+  const dansPeriode = (created_at?: string) => {
+    if (!created_at) return true;
+    const d = created_at.slice(0, 10);
+    if (dateDebut && d < dateDebut) return false;
+    if (dateFin && d > dateFin) return false;
+    return true;
+  };
+
+  const charger = async () => {
+    setLoading(true);
+
+    const [
+      { data: commandes },
+      { data: maillotsData },
+      { data: etiquettesData },
+      { data: businessData },
+      { data: formationData },
+    ] = await Promise.all([
+      supabase.from("commandes").select("*"),
+      supabase.from("maillots").select("*"),
+      supabase.from("etiquettes").select("*"),
+      supabase.from("business_ventes").select("*"),
+      supabase.from("formations").select("*"),
+    ]);
+
+    // --- Commandes ---
+    let cCa = 0,
+      cAchat = 0;
+    (commandes || []).filter((r) => dansPeriode(r.created_at)).forEach((r: any) => {
+      cCa += n(r.montant);
+      cAchat += n(r.prix_achat);
+    });
+    setCmd({ ca: cCa, achat: cAchat, benef: cCa - cAchat });
+
+    // --- Maillots ---
+    let mCa = 0,
+      mAchat = 0;
+    (maillotsData || []).filter((r) => dansPeriode(r.created_at)).forEach((r: any) => {
+      // total client / vente
+      mCa += n(r.montant || r.prix_total || r.total || r.prix_vente);
+      mAchat += n(r.prix_achat || r.cout || r.total_achat);
+    });
+    setMaillots({ ca: mCa, achat: mAchat, benef: mCa - mAchat });
+
+    // --- Étiquettes ---
+    let eCa = 0,
+      eAchat = 0;
+    (etiquettesData || []).filter((r) => dansPeriode(r.created_at)).forEach((r: any) => {
+      eCa += n(r.montant_client || r.montant || r.prix_total || r.total);
+      eAchat += n(r.prix_entreprise || r.prix_achat || r.cout);
+    });
+    setEtiquettes({ ca: eCa, achat: eAchat, benef: eCa - eAchat });
+
+    // --- Business ---
+    let bCa = 0,
+      bAchat = 0;
+    (businessData || []).filter((r) => dansPeriode(r.created_at)).forEach((r: any) => {
+      bCa += n(r.prix_vente || r.montant);
+      bAchat += n(r.prix_achat);
+    });
+    setBusiness({ ca: bCa, achat: bAchat, benef: bCa - bAchat });
+
+    // --- Formation (souvent tout le payé = bénéfice) ---
+    let fCa = 0;
+    (formationData || []).filter((r) => dansPeriode(r.created_at)).forEach((r: any) => {
+      fCa += n(r.montant_paye || r.paye || r.inscription || r.total_paye || r.montant);
+    });
+    setFormation({ ca: fCa, benef: fCa });
+
+    setLoading(false);
+  };
 
   useEffect(() => {
-    async function charger() {
-      setLoading(true);
-
-      const debut = mois + "-01";
-      const finDate = new Date(Number(mois.slice(0, 4)), Number(mois.slice(5, 7)), 0);
-      const fin = finDate.toISOString().slice(0, 10);
-
-      const dansMois = (dateStr: string | null) => {
-        if (!dateStr) return false;
-        const d = dateStr.slice(0, 10);
-        return d >= debut && d <= fin;
-      };
-
-      const { data: commandes } = await supabase.from("commandes").select("*");
-      const { data: maillots } = await supabase.from("maillots").select("*");
-      const { data: eleves } = await supabase.from("eleves").select("*");
-      const { data: etiquettes } = await supabase.from("etiquettes").select("*");
-      const { data: wifi } = await supabase.from("wifi_zone").select("*");
-      const { data: depenses } = await supabase.from("depenses").select("*");
-
-      let commandesCA = 0, commandesAchat = 0, commandesNb = 0;
-      (commandes || []).filter((c: any) => dansMois(c.created_at)).forEach((c: any) => {
-        const vente = parseFloat((c.montant || "0").toString().replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
-        commandesCA += vente;
-        commandesAchat += c.prix_achat || 0;
-        commandesNb += 1;
-      });
-
-      let maillotsCA = 0, maillotsAchat = 0, maillotsNb = 0;
-      (maillots || []).filter((m: any) => dansMois(m.created_at)).forEach((m: any) => {
-        maillotsCA += m.total || 0;
-        maillotsAchat += (m.prix_maillot || 0) * (m.quantite || 1);
-        maillotsNb += 1;
-      });
-
-      let etiquettesCA = 0, etiquettesNb = 0;
-      (etiquettes || []).filter((e: any) => dansMois(e.created_at)).forEach((e: any) => {
-        etiquettesCA += e.total || 0;
-        etiquettesNb += 1;
-      });
-
-      let formationsCA = 0, formationsNb = 0;
-      (eleves || []).filter((e: any) => dansMois(e.created_at)).forEach((e: any) => {
-        formationsCA += e.total_paye || 0;
-        formationsNb += 1;
-      });
-
-      let wifiCA = 0, wifiNb = 0;
-      (wifi || []).filter((w: any) => dansMois(w.created_at)).forEach((w: any) => {
-        wifiCA += w.prix || 0;
-        wifiNb += 1;
-      });
-
-      // Coût fixe WiFi : uniquement dans la partie WiFi
-      const wifiCout = 16000;
-      const wifiBenefice = wifiCA - wifiCout;
-
-      let depensesTotal = 0, depensesNb = 0;
-      (depenses || []).filter((d: any) => dansMois(d.created_at)).forEach((d: any) => {
-        depensesTotal += d.montant || 0;
-        depensesNb += 1;
-      });
-
-      // Graphique = impression seulement (pas WiFi, pas formation)
-      const map: Record<string, number> = {};
-      const ajouterJour = (dateStr: string | null, montant: number) => {
-        if (!dateStr || !dansMois(dateStr)) return;
-        const jour = new Date(dateStr).toLocaleDateString("fr-FR", {
-          day: "2-digit",
-          month: "2-digit",
-        });
-        map[jour] = (map[jour] || 0) + montant;
-      };
-
-      (commandes || []).forEach((c: any) => {
-        const vente = parseFloat((c.montant || "0").toString().replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
-        ajouterJour(c.created_at, vente - (c.prix_achat || 0));
-      });
-      (maillots || []).forEach((m: any) => {
-        ajouterJour(m.created_at, (m.total || 0) - (m.prix_maillot || 0) * (m.quantite || 1));
-      });
-      (etiquettes || []).forEach((e: any) => ajouterJour(e.created_at, e.total || 0));
-
-      const evo = Object.entries(map)
-        .map(([jour, benefice]) => ({ jour, benefice }))
-        .sort((a, b) => {
-          const [da, ma] = a.jour.split("/").map(Number);
-          const [db, mb] = b.jour.split("/").map(Number);
-          return ma === mb ? da - db : ma - mb;
-        });
-
-      setStats({
-        commandesCA,
-        commandesAchat,
-        commandesBenefice: commandesCA - commandesAchat,
-        commandesNb,
-        maillotsCA,
-        maillotsAchat,
-        maillotsBenefice: maillotsCA - maillotsAchat,
-        maillotsNb,
-        etiquettesCA,
-        etiquettesNb,
-        formationsCA,
-        formationsNb,
-        wifiCA,
-        wifiNb,
-        wifiCout,
-        wifiBenefice,
-        depensesTotal,
-        depensesNb,
-      });
-      setEvolution(evo);
-      setLoading(false);
-    }
-
     charger();
-  }, [mois]);
+  }, [dateDebut, dateFin]);
 
-  // TOTAL PRINCIPAL = impression seulement (le 16000 WiFi n'est PAS dedans)
-  const totalCA = stats.commandesCA + stats.maillotsCA + stats.etiquettesCA;
-  const totalAchat = stats.commandesAchat + stats.maillotsAchat;
-  const totalBenefice = stats.commandesBenefice + stats.maillotsBenefice + stats.etiquettesCA;
+  const beneficeTotal =
+    cmd.benef + maillots.benef + etiquettes.benef + business.benef + formation.benef;
 
-  const maxBenef = Math.max(...evolution.map((e) => Math.abs(e.benefice)), 1);
-  const labelMois = new Date(mois + "-01").toLocaleDateString("fr-FR", {
-    month: "long",
-    year: "numeric",
-  });
+  const lignes = [
+    { nom: "Commandes / Ventes", benef: cmd.benef, detail: `CA ${cmd.ca.toLocaleString("fr-FR")} − Achats ${cmd.achat.toLocaleString("fr-FR")}` },
+    { nom: "Maillots", benef: maillots.benef, detail: `CA ${maillots.ca.toLocaleString("fr-FR")} − Achats ${maillots.achat.toLocaleString("fr-FR")}` },
+    { nom: "Étiquettes", benef: etiquettes.benef, detail: `Client ${etiquettes.ca.toLocaleString("fr-FR")} − Fabrication ${etiquettes.achat.toLocaleString("fr-FR")}` },
+    { nom: "Business annexe", benef: business.benef, detail: `CA ${business.ca.toLocaleString("fr-FR")} − Achats ${business.achat.toLocaleString("fr-FR")}` },
+    { nom: "Formation", benef: formation.benef, detail: `Montants encaissés ${formation.ca.toLocaleString("fr-FR")}` },
+  ];
 
   return (
     <div style={{ color: "#0f172a", background: "#f8fafc", minHeight: "100%" }}>
-      <header style={{ background: "white", borderBottom: "1px solid #e5e7eb", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <header
+        style={{
+          background: "white",
+          borderBottom: "1px solid #e5e7eb",
+          padding: "12px 16px",
+        }}
+      >
         <h2 style={{ margin: 0, fontSize: 18 }}>Rapports</h2>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <input
-            type="month"
-            value={mois}
-            onChange={(e) => setMois(e.target.value)}
-            style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #d1d5db" }}
-          />
-          <button
-            onClick={() => window.print()}
-            style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}
-          >
-            Imprimer ce mois
-          </button>
-        </div>
+        <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
+          Détail par activité + bénéfice total réel
+        </p>
       </header>
 
       <div style={{ padding: 16 }}>
-        <p style={{ marginTop: 0, color: "#6b7280" }}>
-          Rapport du mois : <strong>{labelMois}</strong>
-        </p>
+        {/* Filtres date */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 10,
+            marginBottom: 16,
+            alignItems: "center",
+          }}
+        >
+          <label style={{ fontSize: 13 }}>
+            Du{" "}
+            <input
+              type="date"
+              value={dateDebut}
+              onChange={(e) => setDateDebut(e.target.value)}
+              style={inputStyle}
+            />
+          </label>
+          <label style={{ fontSize: 13 }}>
+            Au{" "}
+            <input
+              type="date"
+              value={dateFin}
+              onChange={(e) => setDateFin(e.target.value)}
+              style={inputStyle}
+            />
+          </label>
+          <button
+            onClick={() => {
+              setDateDebut("");
+              setDateFin("");
+            }}
+            style={{
+              background: "#f3f4f6",
+              border: "none",
+              borderRadius: 8,
+              padding: "8px 12px",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            Tout afficher
+          </button>
+        </div>
 
         {loading ? (
-          <div style={{ textAlign: "center", padding: 40 }}>Chargement...</div>
+          <div style={{ padding: 24, textAlign: "center" }}>Chargement...</div>
         ) : (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 20 }}>
-              <div style={{ background: "linear-gradient(135deg,#2563eb,#1d4ed8)", color: "white", borderRadius: 16, padding: 18 }}>
-                <div style={{ fontSize: 13, opacity: 0.9 }}>CA Impression</div>
-                <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6 }}>{totalCA.toLocaleString("fr-FR")} FCFA</div>
+            {/* ========== BÉNÉFICE TOTAL (nouveau) ========== */}
+            <div
+              style={{
+                background: "linear-gradient(135deg, #065f46 0%, #047857 50%, #ca8a04 100%)",
+                borderRadius: 16,
+                padding: 20,
+                color: "white",
+                marginBottom: 20,
+                boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+              }}
+            >
+              <div style={{ fontSize: 14, opacity: 0.95, marginBottom: 6 }}>
+                Bénéfice total (toutes activités)
               </div>
-              <div style={{ background: "linear-gradient(135deg,#f97316,#ea580c)", color: "white", borderRadius: 16, padding: 18 }}>
-                <div style={{ fontSize: 13, opacity: 0.9 }}>Achats matériaux</div>
-                <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6 }}>{totalAchat.toLocaleString("fr-FR")} FCFA</div>
+              <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-0.02em" }}>
+                {beneficeTotal.toLocaleString("fr-FR")} FCFA
               </div>
-              <div style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "white", borderRadius: 16, padding: 18 }}>
-                <div style={{ fontSize: 13, opacity: 0.9 }}>Bénéfice impression</div>
-                <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6 }}>{totalBenefice.toLocaleString("fr-FR")} FCFA</div>
+              <div style={{ fontSize: 12, opacity: 0.9, marginTop: 8 }}>
+                Commandes + Maillots + Étiquettes + Business + Formation
               </div>
             </div>
 
-            <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, marginBottom: 20 }}>
-              <h3 style={{ marginTop: 0 }}>Évolution bénéfice impression</h3>
-              <p style={{ marginTop: -6, color: "#6b7280", fontSize: 12 }}>Commandes + Maillots + Étiquettes</p>
-
-              {evolution.length === 0 ? (
-                <p style={{ textAlign: "center", color: "#9ca3af", padding: 30 }}>Pas de données pour ce mois</p>
-              ) : (
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 180, marginTop: 12, overflowX: "auto" }}>
-                  {evolution.map((item, index) => {
-                    const height = Math.max((Math.abs(item.benefice) / maxBenef) * 100, 8);
-                    const isPositif = item.benefice >= 0;
-                    return (
-                      <div key={index} style={{ flex: "1 0 40px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                        <span style={{ fontSize: 10, fontWeight: 600, color: isPositif ? "#059669" : "#dc2626" }}>
-                          {item.benefice.toLocaleString("fr-FR")}
-                        </span>
-                        <div style={{ width: "100%", maxWidth: 36, height: 120, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                          <div
-                            style={{
-                              width: "100%",
-                              height: height + "%",
-                              borderRadius: "8px 8px 0 0",
-                              background: isPositif
-                                ? "linear-gradient(to top, #10b981, #34d399)"
-                                : "linear-gradient(to top, #ef4444, #f87171)",
-                            }}
-                          />
-                        </div>
-                        <span style={{ fontSize: 11, color: "#6b7280" }}>{item.jour}</span>
-                      </div>
-                    );
-                  })}
+            {/* Détail des bénéfices par partie */}
+            <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Détail des bénéfices</h3>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 12,
+                marginBottom: 24,
+              }}
+            >
+              {lignes.map((l) => (
+                <div
+                  key={l.nom}
+                  style={{
+                    background: "white",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 12,
+                    padding: 14,
+                  }}
+                >
+                  <div style={{ fontSize: 13, color: "#64748b" }}>{l.nom}</div>
+                  <div
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 800,
+                      color: l.benef >= 0 ? "#059669" : "#dc2626",
+                      marginTop: 4,
+                    }}
+                  >
+                    {l.benef.toLocaleString("fr-FR")} FCFA
+                  </div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>{l.detail}</div>
                 </div>
-              )}
+              ))}
             </div>
 
-            <h3 style={{ marginBottom: 10 }}>Détail par activité</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-              <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14 }}>
-                <h3 style={{ marginTop: 0 }}>Commandes</h3>
-                <p style={{ margin: "4px 0" }}>Nombre : {stats.commandesNb}</p>
-                <p style={{ margin: "4px 0" }}>CA : <b style={{ color: "#2563eb" }}>{stats.commandesCA.toLocaleString("fr-FR")} FCFA</b></p>
-                <p style={{ margin: "4px 0" }}>Coûts : <b style={{ color: "#ea580c" }}>{stats.commandesAchat.toLocaleString("fr-FR")} FCFA</b></p>
-                <p style={{ margin: "4px 0" }}>Bénéfice : <b style={{ color: "#059669" }}>{stats.commandesBenefice.toLocaleString("fr-FR")} FCFA</b></p>
-              </div>
-
-              <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14 }}>
-                <h3 style={{ marginTop: 0 }}>Maillots</h3>
-                <p style={{ margin: "4px 0" }}>Nombre : {stats.maillotsNb}</p>
-                <p style={{ margin: "4px 0" }}>CA : <b style={{ color: "#2563eb" }}>{stats.maillotsCA.toLocaleString("fr-FR")} FCFA</b></p>
-                <p style={{ margin: "4px 0" }}>Coûts : <b style={{ color: "#ea580c" }}>{stats.maillotsAchat.toLocaleString("fr-FR")} FCFA</b></p>
-                <p style={{ margin: "4px 0" }}>Bénéfice : <b style={{ color: "#059669" }}>{stats.maillotsBenefice.toLocaleString("fr-FR")} FCFA</b></p>
-              </div>
-
-              <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14 }}>
-                <h3 style={{ marginTop: 0 }}>Étiquettes</h3>
-                <p style={{ margin: "4px 0" }}>Nombre : {stats.etiquettesNb}</p>
-                <p style={{ margin: "4px 0" }}>CA : <b style={{ color: "#2563eb" }}>{stats.etiquettesCA.toLocaleString("fr-FR")} FCFA</b></p>
-                <p style={{ margin: "4px 0" }}>Bénéfice : <b style={{ color: "#059669" }}>{stats.etiquettesCA.toLocaleString("fr-FR")} FCFA</b></p>
-              </div>
-
-              <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 14, padding: 14 }}>
-                <h3 style={{ marginTop: 0 }}>Formations</h3>
-                <p style={{ margin: "4px 0" }}>Élèves : {stats.formationsNb}</p>
-                <p style={{ margin: "4px 0" }}>Encaissé : <b style={{ color: "#7c3aed" }}>{stats.formationsCA.toLocaleString("fr-FR")} FCFA</b></p>
-              </div>
-
-              {/* WIFI : le 16000 est UNIQUEMENT ici */}
-              <div style={{ background: "#ecfeff", border: "2px solid #06b6d4", borderRadius: 14, padding: 14 }}>
-                <h3 style={{ marginTop: 0 }}>WiFi Zone / Diffusion</h3>
-                <p style={{ margin: "4px 0" }}>Ventes : {stats.wifiNb}</p>
-                <p style={{ margin: "4px 0" }}>CA WiFi : <b style={{ color: "#0891b2" }}>{stats.wifiCA.toLocaleString("fr-FR")} FCFA</b></p>
-                <p style={{ margin: "4px 0" }}>Coût mensuel : <b style={{ color: "#ea580c" }}>{stats.wifiCout.toLocaleString("fr-FR")} FCFA</b></p>
-                <p style={{ margin: "4px 0" }}>
-                  Bénéfice WiFi :{" "}
-                  <b style={{ color: stats.wifiBenefice >= 0 ? "#059669" : "#dc2626" }}>
-                    {stats.wifiBenefice.toLocaleString("fr-FR")} FCFA
-                  </b>
-                </p>
-                <p style={{ margin: "6px 0 0", fontSize: 11, color: "#64748b" }}>
-                  Le 16 000 FCFA est calculé seulement ici, pas sur les commandes.
-                </p>
-              </div>
-
-              <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 14, padding: 14 }}>
-                <h3 style={{ marginTop: 0 }}>Dépenses</h3>
-                <p style={{ margin: "4px 0" }}>Nombre : {stats.depensesNb}</p>
-                <p style={{ margin: "4px 0" }}>Total : <b style={{ color: "#ea580c" }}>{stats.depensesTotal.toLocaleString("fr-FR")} FCFA</b></p>
-              </div>
+            {/* Récap classique CA / Achats (commandes) — inchangé dans l’esprit */}
+            <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Commandes (détail CA)</h3>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: 10,
+                marginBottom: 16,
+              }}
+            >
+              <Mini titre="CA commandes" valeur={cmd.ca} couleur="#2563eb" />
+              <Mini titre="Achats commandes" valeur={cmd.achat} couleur="#ea580c" />
+              <Mini titre="Bénéfice commandes" valeur={cmd.benef} couleur="#059669" />
             </div>
+
+            <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 8 }}>
+              Le bénéfice total en haut regroupe uniquement les gains (pas le chiffre d’affaires
+              global mélangé). Filtre par dates pour voir un mois précis.
+            </p>
           </>
         )}
       </div>
     </div>
   );
 }
+
+function Mini({
+  titre,
+  valeur,
+  couleur,
+}: {
+  titre: string;
+  valeur: number;
+  couleur: string;
+}) {
+  return (
+    <div
+      style={{
+        background: "white",
+        border: "1px solid #e5e7eb",
+        borderRadius: 12,
+        padding: 12,
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#64748b" }}>{titre}</div>
+      <div style={{ fontWeight: 800, fontSize: 16, color: couleur, marginTop: 4 }}>
+        {valeur.toLocaleString("fr-FR")} FCFA
+      </div>
+    </div>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  padding: "6px 10px",
+  borderRadius: 8,
+  border: "1px solid #d1d5db",
+  marginLeft: 6,
+};
