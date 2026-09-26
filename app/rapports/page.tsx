@@ -17,6 +17,7 @@ export default function RapportsPage() {
   const [etiquettes, setEtiquettes] = useState({ ca: 0, achat: 0, benef: 0 });
   const [business, setBusiness] = useState({ ca: 0, achat: 0, benef: 0 });
   const [formation, setFormation] = useState({ ca: 0, benef: 0 });
+  const [parJour, setParJour] = useState<{ jour: string; benef: number }[]>([]);
 
   const dansPeriode = (created_at?: string) => {
     if (!created_at) return true;
@@ -43,49 +44,80 @@ export default function RapportsPage() {
       supabase.from("formations").select("*"),
     ]);
 
-    // --- Commandes ---
+    const mapJour: Record<string, number> = {};
+
+    const addJour = (created_at: string | undefined, benef: number) => {
+      if (!created_at || !dansPeriode(created_at)) return;
+      const j = created_at.slice(0, 10);
+      mapJour[j] = (mapJour[j] || 0) + benef;
+    };
+
+    // Commandes
     let cCa = 0,
       cAchat = 0;
-    (commandes || []).filter((r) => dansPeriode(r.created_at)).forEach((r: any) => {
-      cCa += n(r.montant);
-      cAchat += n(r.prix_achat);
+    (commandes || []).forEach((r: any) => {
+      if (!dansPeriode(r.created_at)) return;
+      const ca = n(r.montant);
+      const achat = n(r.prix_achat);
+      cCa += ca;
+      cAchat += achat;
+      addJour(r.created_at, ca - achat);
     });
     setCmd({ ca: cCa, achat: cAchat, benef: cCa - cAchat });
 
-    // --- Maillots ---
+    // Maillots
     let mCa = 0,
       mAchat = 0;
-    (maillotsData || []).filter((r) => dansPeriode(r.created_at)).forEach((r: any) => {
-      // total client / vente
-      mCa += n(r.montant || r.prix_total || r.total || r.prix_vente);
-      mAchat += n(r.prix_achat || r.cout || r.total_achat);
+    (maillotsData || []).forEach((r: any) => {
+      if (!dansPeriode(r.created_at)) return;
+      const ca = n(r.montant || r.prix_total || r.total || r.prix_vente);
+      const achat = n(r.prix_achat || r.cout || r.total_achat);
+      mCa += ca;
+      mAchat += achat;
+      addJour(r.created_at, ca - achat);
     });
     setMaillots({ ca: mCa, achat: mAchat, benef: mCa - mAchat });
 
-    // --- Étiquettes ---
+    // Étiquettes
     let eCa = 0,
       eAchat = 0;
-    (etiquettesData || []).filter((r) => dansPeriode(r.created_at)).forEach((r: any) => {
-      eCa += n(r.montant_client || r.montant || r.prix_total || r.total);
-      eAchat += n(r.prix_entreprise || r.prix_achat || r.cout);
+    (etiquettesData || []).forEach((r: any) => {
+      if (!dansPeriode(r.created_at)) return;
+      const ca = n(r.montant_client || r.montant || r.prix_total || r.total);
+      const achat = n(r.prix_entreprise || r.prix_achat || r.cout);
+      eCa += ca;
+      eAchat += achat;
+      addJour(r.created_at, ca - achat);
     });
     setEtiquettes({ ca: eCa, achat: eAchat, benef: eCa - eAchat });
 
-    // --- Business ---
+    // Business
     let bCa = 0,
       bAchat = 0;
-    (businessData || []).filter((r) => dansPeriode(r.created_at)).forEach((r: any) => {
-      bCa += n(r.prix_vente || r.montant);
-      bAchat += n(r.prix_achat);
+    (businessData || []).forEach((r: any) => {
+      if (!dansPeriode(r.created_at)) return;
+      const ca = n(r.prix_vente || r.montant);
+      const achat = n(r.prix_achat);
+      bCa += ca;
+      bAchat += achat;
+      addJour(r.created_at, ca - achat);
     });
     setBusiness({ ca: bCa, achat: bAchat, benef: bCa - bAchat });
 
-    // --- Formation (souvent tout le payé = bénéfice) ---
+    // Formation
     let fCa = 0;
-    (formationData || []).filter((r) => dansPeriode(r.created_at)).forEach((r: any) => {
-      fCa += n(r.montant_paye || r.paye || r.inscription || r.total_paye || r.montant);
+    (formationData || []).forEach((r: any) => {
+      if (!dansPeriode(r.created_at)) return;
+      const paye = n(r.montant_paye || r.paye || r.inscription || r.total_paye || r.montant);
+      fCa += paye;
+      addJour(r.created_at, paye);
     });
     setFormation({ ca: fCa, benef: fCa });
+
+    const jours = Object.keys(mapJour)
+      .sort()
+      .map((jour) => ({ jour, benef: mapJour[jour] }));
+    setParJour(jours);
 
     setLoading(false);
   };
@@ -98,12 +130,15 @@ export default function RapportsPage() {
     cmd.benef + maillots.benef + etiquettes.benef + business.benef + formation.benef;
 
   const lignes = [
-    { nom: "Commandes / Ventes", benef: cmd.benef, detail: `CA ${cmd.ca.toLocaleString("fr-FR")} − Achats ${cmd.achat.toLocaleString("fr-FR")}` },
-    { nom: "Maillots", benef: maillots.benef, detail: `CA ${maillots.ca.toLocaleString("fr-FR")} − Achats ${maillots.achat.toLocaleString("fr-FR")}` },
-    { nom: "Étiquettes", benef: etiquettes.benef, detail: `Client ${etiquettes.ca.toLocaleString("fr-FR")} − Fabrication ${etiquettes.achat.toLocaleString("fr-FR")}` },
-    { nom: "Business annexe", benef: business.benef, detail: `CA ${business.ca.toLocaleString("fr-FR")} − Achats ${business.achat.toLocaleString("fr-FR")}` },
-    { nom: "Formation", benef: formation.benef, detail: `Montants encaissés ${formation.ca.toLocaleString("fr-FR")}` },
+    { nom: "Commandes", benef: cmd.benef, couleur: "#7c3aed" },
+    { nom: "Maillots", benef: maillots.benef, couleur: "#2563eb" },
+    { nom: "Étiquettes", benef: etiquettes.benef, couleur: "#ea580c" },
+    { nom: "Business", benef: business.benef, couleur: "#0f766e" },
+    { nom: "Formation", benef: formation.benef, couleur: "#ca8a04" },
   ];
+
+  const maxBarre = Math.max(...lignes.map((l) => Math.abs(l.benef)), 1);
+  const maxJour = Math.max(...parJour.map((j) => Math.abs(j.benef)), 1);
 
   return (
     <div style={{ color: "#0f172a", background: "#f8fafc", minHeight: "100%" }}>
@@ -116,12 +151,12 @@ export default function RapportsPage() {
       >
         <h2 style={{ margin: 0, fontSize: 18 }}>Rapports</h2>
         <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
-          Détail par activité + bénéfice total réel
+          Bénéfice total + graphiques par activité et par date
         </p>
       </header>
 
       <div style={{ padding: 16 }}>
-        {/* Filtres date */}
+        {/* Filtres */}
         <div
           style={{
             display: "flex",
@@ -171,7 +206,7 @@ export default function RapportsPage() {
           <div style={{ padding: 24, textAlign: "center" }}>Chargement...</div>
         ) : (
           <>
-            {/* ========== BÉNÉFICE TOTAL (nouveau) ========== */}
+            {/* BÉNÉFICE TOTAL — inchangé */}
             <div
               style={{
                 background: "linear-gradient(135deg, #065f46 0%, #047857 50%, #ca8a04 100%)",
@@ -185,105 +220,7 @@ export default function RapportsPage() {
               <div style={{ fontSize: 14, opacity: 0.95, marginBottom: 6 }}>
                 Bénéfice total (toutes activités)
               </div>
-              <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-0.02em" }}>
+              <div style={{ fontSize: 32, fontWeight: 800 }}>
                 {beneficeTotal.toLocaleString("fr-FR")} FCFA
               </div>
-              <div style={{ fontSize: 12, opacity: 0.9, marginTop: 8 }}>
-                Commandes + Maillots + Étiquettes + Business + Formation
-              </div>
-            </div>
-
-            {/* Détail des bénéfices par partie */}
-            <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Détail des bénéfices</h3>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: 12,
-                marginBottom: 24,
-              }}
-            >
-              {lignes.map((l) => (
-                <div
-                  key={l.nom}
-                  style={{
-                    background: "white",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 12,
-                    padding: 14,
-                  }}
-                >
-                  <div style={{ fontSize: 13, color: "#64748b" }}>{l.nom}</div>
-                  <div
-                    style={{
-                      fontSize: 20,
-                      fontWeight: 800,
-                      color: l.benef >= 0 ? "#059669" : "#dc2626",
-                      marginTop: 4,
-                    }}
-                  >
-                    {l.benef.toLocaleString("fr-FR")} FCFA
-                  </div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>{l.detail}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Récap classique CA / Achats (commandes) — inchangé dans l’esprit */}
-            <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Commandes (détail CA)</h3>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                gap: 10,
-                marginBottom: 16,
-              }}
-            >
-              <Mini titre="CA commandes" valeur={cmd.ca} couleur="#2563eb" />
-              <Mini titre="Achats commandes" valeur={cmd.achat} couleur="#ea580c" />
-              <Mini titre="Bénéfice commandes" valeur={cmd.benef} couleur="#059669" />
-            </div>
-
-            <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 8 }}>
-              Le bénéfice total en haut regroupe uniquement les gains (pas le chiffre d’affaires
-              global mélangé). Filtre par dates pour voir un mois précis.
-            </p>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Mini({
-  titre,
-  valeur,
-  couleur,
-}: {
-  titre: string;
-  valeur: number;
-  couleur: string;
-}) {
-  return (
-    <div
-      style={{
-        background: "white",
-        border: "1px solid #e5e7eb",
-        borderRadius: 12,
-        padding: 12,
-      }}
-    >
-      <div style={{ fontSize: 12, color: "#64748b" }}>{titre}</div>
-      <div style={{ fontWeight: 800, fontSize: 16, color: couleur, marginTop: 4 }}>
-        {valeur.toLocaleString("fr-FR")} FCFA
-      </div>
-    </div>
-  );
-}
-
-const inputStyle: React.CSSProperties = {
-  padding: "6px 10px",
-  borderRadius: 8,
-  border: "1px solid #d1d5db",
-  marginLeft: 6,
-};
+              <div style={{ fontSize: 12, opacity: 0.9, margin
