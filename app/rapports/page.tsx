@@ -1,366 +1,316 @@
-"use client";
+const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    produit: "",
+    nom: "",
+    quantite: "0",
+    seuil: "5",
+  });
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+  const charger = async () => {
+    setLoading(true);
+    const { data } = await supabase
+    const { data, error } = await supabase
+      .from("stocks")
+      .select("*")
+      .order("produit", { ascending: true });
+    setRows(data || []);
+      .order("nom", { ascending: true });
 
-type MonthKey = string;
-
-type Totaux = {
-  ca: number;
-  achats: number;
-  depenses: number;
-  benefice: number;
-  commandes: number;
-  etiquettes: number;
-  maillots: number;
-  formation: number;
-  wifi: number;
-};
-
-function monthLabel(key: MonthKey) {
-  const [y, m] = key.split("-").map(Number);
-  const names = [
-    "Janvier", "Fevrier", "Mars", "Avril", "Mai", "Juin",
-    "Juillet", "Aout", "Septembre", "Octobre", "Novembre", "Decembre",
-  ];
-  return (names[m - 1] || key) + " " + y;
-}
-
-function toMonthKey(dateStr: string | null | undefined): MonthKey | null {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return null;
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
-}
-
-function currentMonthKey(): MonthKey {
-  const d = new Date();
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
-}
-
-function money(n: number) {
-  return Math.round(n || 0).toLocaleString("fr-FR") + " F";
-}
-
-function emptyTotaux(): Totaux {
-  return {
-    ca: 0,
-    achats: 0,
-    depenses: 0,
-    benefice: 0,
-    commandes: 0,
-    etiquettes: 0,
-    maillots: 0,
-    formation: 0,
-    wifi: 0,
+    if (error) {
+      alert("Erreur chargement : " + error.message);
+      setRows([]);
+    } else {
+      setRows(data || []);
+    }
+    setLoading(false);
   };
-}
 
-export default function RapportsPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<MonthKey>(currentMonthKey());
-  const [byMonth, setByMonth] = useState<Record<MonthKey, Totaux>>({});
+@@ -29,23 +35,23 @@ export default function StocksPage() {
+  }, []);
 
-  useEffect(() => {
-    const load = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        router.replace("/login");
-        return;
-      }
-      const uid = session.user.id;
+  const resetForm = () => {
+    setForm({ produit: "", quantite: "0", seuil: "5" });
+    setForm({ nom: "", quantite: "0", seuil: "5" });
+    setEditId(null);
+    setShowForm(false);
+  };
 
-      const [
-        commandesRes,
-        etiquettesRes,
-        maillotsRes,
-        formationRes,
-        wifiRes,
-        depensesRes,
-      ] = await Promise.all([
-        supabase
-          .from("commandes")
-          .select("created_at, date, total, montant, prix_achat, benefice, owner_id")
-          .eq("owner_id", uid),
-        supabase
-          .from("etiquettes")
-          .select("created_at, date, total, montant, benefice, cout, owner_id")
-          .eq("owner_id", uid),
-        supabase
-          .from("maillots")
-          .select("created_at, date, total, montant, benefice, prix_achat, owner_id")
-          .eq("owner_id", uid),
-        supabase
-          .from("formations")
-          .select(
-            "created_at, date, montant_paye, inscription, total_paye, montant, owner_id"
-          )
-          .eq("owner_id", uid),
-        supabase
-          .from("wifi_zone")
-          .select("created_at, date, prix_total, montant, owner_id")
-          .eq("owner_id", uid),
-        supabase
-          .from("depenses")
-          .select("created_at, date, montant, owner_id")
-          .eq("owner_id", uid),
-      ]);
+  const ouvrirModif = (r: any) => {
+    setEditId(r.id);
+    setForm({
+      produit: r.produit || r.nom || "",
+      quantite: String(r.quantite ?? r.qte ?? 0),
+      seuil: String(r.seuil ?? r.seuil_alerte ?? 5),
+      nom: r.nom || "",
+      quantite: String(r.quantite ?? 0),
+      seuil: String(r.seuil ?? 5),
+    });
+    setShowForm(true);
+  };
 
-      const map: Record<MonthKey, Totaux> = {};
+  const enregistrer = async () => {
+    if (!form.produit.trim()) {
+    if (!form.nom.trim()) {
+      alert("Nom du produit obligatoire");
+      return;
+    }
+@@ -54,36 +60,36 @@ export default function StocksPage() {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user) {
+      alert("Session expirée. Reconnecte-toi.");
+      return;
+    }
 
-      const ensure = (key: MonthKey) => {
-        if (!map[key]) map[key] = emptyTotaux();
-        return map[key];
-      };
-
-      (commandesRes.data || []).forEach((row: any) => {
-        const key = toMonthKey(row.date || row.created_at);
-        if (!key) return;
-        const t = ensure(key);
-        const ca = Number(row.total ?? row.montant ?? 0) || 0;
-        const achat = Number(row.prix_achat ?? 0) || 0;
-        const ben = row.benefice != null ? Number(row.benefice) : ca - achat;
-        t.ca += ca;
-        t.achats += achat;
-        t.commandes += ca;
-        t.benefice += ben;
-      });
-
-      (etiquettesRes.data || []).forEach((row: any) => {
-        const key = toMonthKey(row.date || row.created_at);
-        if (!key) return;
-        const t = ensure(key);
-        const ca = Number(row.total ?? row.montant ?? 0) || 0;
-        const cout = Number(row.cout ?? 0) || 0;
-        const ben = row.benefice != null ? Number(row.benefice) : ca - cout;
-        t.ca += ca;
-        t.achats += cout;
-        t.etiquettes += ca;
-        t.benefice += ben;
-      });
-
-      (maillotsRes.data || []).forEach((row: any) => {
-        const key = toMonthKey(row.date || row.created_at);
-        if (!key) return;
-        const t = ensure(key);
-        const ca = Number(row.total ?? row.montant ?? 0) || 0;
-        const achat = Number(row.prix_achat ?? 0) || 0;
-        const ben = row.benefice != null ? Number(row.benefice) : ca - achat;
-        t.ca += ca;
-        t.achats += achat;
-        t.maillots += ca;
-        t.benefice += ben;
-      });
-
-      // FORMATION — barre + CA + benefice
-      (formationRes.data || []).forEach((row: any) => {
-        const key = toMonthKey(row.date || row.created_at);
-        if (!key) return;
-        const t = ensure(key);
-        const paye =
-          Number(
-            row.montant_paye ??
-              row.total_paye ??
-              row.montant ??
-              row.inscription ??
-              0
-          ) || 0;
-        t.ca += paye;
-        t.formation += paye;
-        t.benefice += paye;
-      });
-
-      (wifiRes.data || []).forEach((row: any) => {
-        const key = toMonthKey(row.date || row.created_at);
-        if (!key) return;
-        const t = ensure(key);
-        const ca = Number(row.prix_total ?? row.montant ?? 0) || 0;
-        t.ca += ca;
-        t.wifi += ca;
-        t.benefice += ca;
-      });
-
-      // Depenses = uniquement sur le benefice (pas le CA)
-      (depensesRes.data || []).forEach((row: any) => {
-        const key = toMonthKey(row.date || row.created_at);
-        if (!key) return;
-        const t = ensure(key);
-        const dep = Number(row.montant ?? 0) || 0;
-        t.depenses += dep;
-        t.benefice -= dep;
-      });
-
-      setByMonth(map);
-      setLoading(false);
+    const payload: any = {
+      produit: form.produit.trim(),
+    const payload = {
+      nom: form.nom.trim(),
+      quantite: Number(form.quantite) || 0,
+      seuil: Number(form.seuil) || 0,
+      owner_id: user.id,
     };
 
-    load();
-  }, [router]);
+    if (user) payload.owner_id = user.id;
 
-  const months = useMemo(
-    () => Object.keys(byMonth).sort().reverse(),
-    [byMonth]
-  );
+    if (editId) {
+      const { error } = await supabase.from("stocks").update(payload).eq("id", editId);
+      const { error } = await supabase
+        .from("stocks")
+        .update({
+          nom: payload.nom,
+          quantite: payload.quantite,
+          seuil: payload.seuil,
+        })
+        .eq("id", editId);
 
-  const current = byMonth[selected] || emptyTotaux();
-  const maxBar = Math.max(
-    current.commandes,
-    current.etiquettes,
-    current.maillots,
-    current.formation,
-    current.wifi,
-    1
-  );
+      if (error) {
+        // colonnes alternatives
+        const { error: e2 } = await supabase
+          .from("stocks")
+          .update({
+            produit: payload.produit,
+            qte: payload.quantite,
+            seuil_alerte: payload.seuil,
+          })
+          .eq("id", editId);
+        if (e2) {
+          alert("Erreur : " + (error.message || e2.message));
+          return;
+        }
+        alert("Erreur modification : " + error.message);
+        return;
+      }
+    } else {
+      const { error } = await supabase.from("stocks").insert([payload]);
+      if (error) {
+        alert("Erreur : " + error.message);
+        alert("Erreur création : " + error.message);
+        return;
+      }
+    }
+@@ -94,7 +100,7 @@ export default function StocksPage() {
 
-  const bars = [
-    { label: "Commandes", value: current.commandes, color: "bg-blue-600" },
-    { label: "Etiquettes", value: current.etiquettes, color: "bg-sky-500" },
-    { label: "Maillots", value: current.maillots, color: "bg-indigo-500" },
-    { label: "Formation", value: current.formation, color: "bg-emerald-500" },
-    { label: "WiFi", value: current.wifi, color: "bg-amber-500" },
-  ];
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      </div>
+  const ajouterQuantite = async (r: any) => {
+    const saisie = prompt(
+      `Ajouter quelle quantité pour « ${r.produit || r.nom} » ?\n(Stock actuel : ${r.quantite ?? r.qte ?? 0})`,
+      `Ajouter quelle quantité pour « ${r.nom} » ?\n(Stock actuel : ${r.quantite ?? 0})`,
+      "10"
     );
-  }
+    if (saisie === null) return;
+@@ -104,18 +110,12 @@ export default function StocksPage() {
+      return;
+    }
+
+    const actuelle = Number(r.quantite ?? r.qte ?? 0);
+    const nouvelle = actuelle + plus;
+
+    let { error } = await supabase
+    const nouvelle = (Number(r.quantite) || 0) + plus;
+    const { error } = await supabase
+      .from("stocks")
+      .update({ quantite: nouvelle })
+      .eq("id", r.id);
+
+    if (error) {
+      ({ error } = await supabase.from("stocks").update({ qte: nouvelle }).eq("id", r.id));
+    }
+
+    if (error) {
+      alert("Erreur : " + error.message);
+      return;
+@@ -129,11 +129,6 @@ export default function StocksPage() {
+    charger();
+  };
+
+  const nom = (r: any) => r.produit || r.nom || "—";
+  const qte = (r: any) => Number(r.quantite ?? r.qte ?? 0);
+  const seuil = (r: any) => Number(r.seuil ?? r.seuil_alerte ?? 5);
+  const estBas = (r: any) => qte(r) <= seuil(r);
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
-      <header className="bg-blue-700 text-white px-4 py-4 flex items-center gap-3 shadow">
-        <Link href="/" className="text-white text-lg font-bold">
-          ←
-        </Link>
-        <h1 className="font-bold text-lg flex-1">Rapports</h1>
-      </header>
+    <div style={{ color: "#0f172a", background: "#f8fafc", minHeight: "100%" }}>
+      <header
+@@ -195,8 +190,8 @@ export default function StocksPage() {
+            >
+              <input
+                placeholder="Nom du produit"
+                value={form.produit}
+                onChange={(e) => setForm({ ...form, produit: e.target.value })}
+                value={form.nom}
+                onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                style={inputStyle}
+              />
+              <input
+@@ -273,61 +268,38 @@ export default function StocksPage() {
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                      <td style={td}>
+                        <strong>{nom(r)}</strong>
+                      </td>
+                      <td style={{ ...td, fontWeight: 700 }}>{qte(r)}</td>
+                      <td style={td}>{seuil(r)}</td>
+                      <td style={td}>
+                        {estBas(r) ? (
+                          <span
+                            style={{
+                              background: "#fee2e2",
+                              color: "#dc2626",
+                              padding: "2px 8px",
+                              borderRadius: 999,
+                              fontSize: 11,
+                              fontWeight: 600,
+                            }}
+                          >
+                            Stock bas
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              background: "#d1fae5",
+                              color: "#059669",
+                              padding: "2px 8px",
+                              borderRadius: 999,
+                              fontSize: 11,
+                              fontWeight: 600,
+                            }}
+                          >
+                            OK
+                          </span>
+                        )}
+                      </td>
+                      <td style={td}>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button
+                            onClick={() => ajouterQuantite(r)}
+                            style={btnVert}
+                            title="Ajouter une quantité"
+                          >
+                            + Stock
+                          </button>
+                          <button onClick={() => ouvrirModif(r)} style={btnBleu}>
+                            Modifier
+                          </button>
+                          <button onClick={() => supprimer(r.id)} style={btnRouge}>
+                            Supprimer
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {rows.map((r) => {
+                    const bas = (Number(r.quantite) || 0) <= (Number(r.seuil) || 0);
+                    return (
+                      <tr key={r.id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                        <td style={td}>
+                          <strong>{r.nom}</strong>
+                        </td>
+                        <td style={{ ...td, fontWeight: 700 }}>{r.quantite}</td>
+                        <td style={td}>{r.seuil}</td>
+                        <td style={td}>
+                          {bas ? (
+                            <span style={badgeRouge}>Stock bas</span>
+                          ) : (
+                            <span style={badgeVert}>OK</span>
+                          )}
+                        </td>
+                        <td style={td}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button onClick={() => ajouterQuantite(r)} style={btnVert}>
+                              + Stock
+                            </button>
+                            <button onClick={() => ouvrirModif(r)} style={btnBleu}>
+                              Modifier
+                            </button>
+                            <button onClick={() => supprimer(r.id)} style={btnRouge}>
+                              Supprimer
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+@@ -345,17 +317,8 @@ const inputStyle: React.CSSProperties = {
+  border: "1px solid #d1d5db",
+  boxSizing: "border-box",
+};
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
-        <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
-          <label className="text-xs text-slate-500 font-semibold uppercase tracking-wide">
-            Mois affiche
-          </label>
-          <select
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-            className="mt-2 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900 bg-white"
-          >
-            {!months.includes(currentMonthKey()) && (
-              <option value={currentMonthKey()}>
-                {monthLabel(currentMonthKey())} (en cours)
-              </option>
-            )}
-            {months.map((k) => (
-              <option key={k} value={k}>
-                {monthLabel(k)}
-                {k === currentMonthKey() ? " (en cours)" : ""}
-              </option>
-            ))}
-          </select>
-          <p className="text-[11px] text-slate-400 mt-2">
-            Chaque mois a son compteur. Les anciens mois restent en historique.
-          </p>
-        </div>
+const th: React.CSSProperties = {
+  padding: "10px 12px",
+  fontSize: 12,
+  color: "#6b7280",
+};
 
-        <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
-          <p className="text-xs text-slate-500 font-medium">Chiffre d affaires (CA)</p>
-          <p className="text-3xl font-black text-slate-900 mt-1">{money(current.ca)}</p>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Les depenses ne baissent pas le CA
-          </p>
-        </div>
+const td: React.CSSProperties = {
+  padding: "10px 12px",
+};
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
-            <p className="text-xs text-slate-500">Achats / couts</p>
-            <p className="text-lg font-bold text-slate-800 mt-1">{money(current.achats)}</p>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
-            <p className="text-xs text-slate-500">Depenses</p>
-            <p className="text-lg font-bold text-red-600 mt-1">{money(current.depenses)}</p>
-          </div>
-        </div>
+const th: React.CSSProperties = { padding: "10px 12px", fontSize: 12, color: "#6b7280" };
+const td: React.CSSProperties = { padding: "10px 12px" };
+const btnVert: React.CSSProperties = {
+  background: "#d1fae5",
+  color: "#047857",
+@@ -366,7 +329,6 @@ const btnVert: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+};
 
-        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 shadow-sm">
-          <p className="text-xs text-emerald-700 font-semibold">Benefice net du mois</p>
-          <p className="text-3xl font-black text-emerald-700 mt-1">{money(current.benefice)}</p>
-          <p className="text-[11px] text-emerald-600 mt-1">CA − achats − depenses</p>
-        </div>
+const btnBleu: React.CSSProperties = {
+  background: "#dbeafe",
+  color: "#1d4ed8",
+@@ -377,7 +339,6 @@ const btnBleu: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+};
 
-        <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
-          <h2 className="font-bold text-sm text-slate-900 mb-4">Detail par activite</h2>
-          <div className="space-y-3">
-            {bars.map((b) => (
-              <div key={b.label}>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="font-semibold text-slate-700">{b.label}</span>
-                  <span className="font-bold text-slate-800">{money(b.value)}</span>
-                </div>
-                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className={"h-full rounded-full " + b.color}
-                    style={{
-                      width: Math.min(100, (b.value / maxBar) * 100) + "%",
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
-          <h2 className="font-bold text-sm text-slate-900 mb-3">Historique des mois</h2>
-          {months.length === 0 && (
-            <p className="text-sm text-slate-400 text-center py-6">
-              Aucune donnee pour l instant.
-            </p>
-          )}
-          <div className="space-y-2">
-            {months.map((k) => {
-              const row = byMonth[k];
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => setSelected(k)}
-                  className={
-                    "w-full text-left rounded-xl px-3 py-3 border transition " +
-                    (k === selected
-                      ? "border-blue-300 bg-blue-50"
-                      : "border-slate-100 bg-slate-50 hover:bg-slate-100")
-                  }
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-bold text-slate-900">
-                      {monthLabel(k)}
-                    </span>
-                    <span className="text-xs font-black text-emerald-700">
-                      {money(row.benefice)}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    CA {money(row.ca)} · Depenses {money(row.depenses)} · Formation{" "}
-                    {money(row.formation)}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <p className="text-[11px] text-center text-slate-400 px-2 pb-4">
-          Formation incluse dans le CA et la barre verte. Une depense diminue le{" "}
-          <b>benefice</b>, pas le chiffre d affaires.
-        </p>
-      </div>
-    </div>
-  );
-}
+const btnRouge: React.CSSProperties = {
+  background: "#fee2e2",
+  color: "#dc2626",
+@@ -387,3 +348,19 @@ const btnRouge: React.CSSProperties = {
+  cursor: "pointer",
+  fontSize: 11,
+};
+const badgeRouge: React.CSSProperties = {
+  background: "#fee2e2",
+  color: "#dc2626",
+  padding: "2px 8px",
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: 600,
+};
+const badgeVert: React.CSSProperties = {
+  background: "#d1fae5",
+  color: "#059669",
+  padding: "2px 8px",
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: 600,
+};
