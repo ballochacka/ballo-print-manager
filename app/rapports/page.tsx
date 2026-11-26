@@ -7,6 +7,9 @@ function n(v: any) {
   return Number(v) || 0;
 }
 
+// Cout mensuel WiFi fixe
+const COUT_WIFI_MENSUEL = 16000;
+
 export default function RapportsPage() {
   const [loading, setLoading] = useState(true);
   const [dateDebut, setDateDebut] = useState("");
@@ -17,6 +20,7 @@ export default function RapportsPage() {
   const [etiquettes, setEtiquettes] = useState({ ca: 0, achat: 0, benef: 0 });
   const [business, setBusiness] = useState({ ca: 0, achat: 0, benef: 0 });
   const [formation, setFormation] = useState({ ca: 0, benef: 0 });
+  const [wifi, setWifi] = useState({ ca: 0, cout: 0, benef: 0 });
   const [depensesTotal, setDepensesTotal] = useState(0);
   const [listeDepenses, setListeDepenses] = useState<
     { id?: string; libelle: string; montant: number; date: string }[]
@@ -29,6 +33,22 @@ export default function RapportsPage() {
     if (dateDebut && d < dateDebut) return false;
     if (dateFin && d > dateFin) return false;
     return true;
+  };
+
+  // Nombre de mois distincts touches par la periode (pour le cout 16000)
+  const moisDansPeriode = (dates: string[]) => {
+    const set = new Set<string>();
+    dates.forEach((d) => {
+      if (!d) return;
+      if (!dansPeriode(d)) return;
+      set.add(String(d).slice(0, 7)); // YYYY-MM
+    });
+    // Si aucune vente WiFi mais on filtre un mois precis, compter 1 mois
+    if (set.size === 0 && (dateDebut || dateFin)) {
+      if (dateDebut) set.add(dateDebut.slice(0, 7));
+      else if (dateFin) set.add(dateFin.slice(0, 7));
+    }
+    return Math.max(set.size, 0);
   };
 
   const charger = async () => {
@@ -44,6 +64,7 @@ export default function RapportsPage() {
     let qEti = supabase.from("etiquettes").select("*");
     let qBus = supabase.from("business_ventes").select("*");
     let qFor = supabase.from("formations").select("*");
+    let qWifi = supabase.from("wifi_zone").select("*");
     let qDep = supabase.from("depenses").select("*");
 
     if (uid) {
@@ -52,6 +73,7 @@ export default function RapportsPage() {
       qEti = qEti.eq("owner_id", uid);
       qBus = qBus.eq("owner_id", uid);
       qFor = qFor.eq("owner_id", uid);
+      qWifi = qWifi.eq("owner_id", uid);
       qDep = qDep.eq("owner_id", uid);
     }
 
@@ -61,8 +83,9 @@ export default function RapportsPage() {
       { data: etiquettesData },
       { data: businessData },
       { data: formationData },
+      { data: wifiData },
       { data: depensesData },
-    ] = await Promise.all([qCmd, qMai, qEti, qBus, qFor, qDep]);
+    ] = await Promise.all([qCmd, qMai, qEti, qBus, qFor, qWifi, qDep]);
 
     const mapJour: Record<string, number> = {};
 
@@ -124,7 +147,7 @@ export default function RapportsPage() {
     });
     setBusiness({ ca: bCa, achat: bAchat, benef: bCa - bAchat });
 
-    // FORMATION — entre dans le benefice + barre
+    // Formation
     let fCa = 0;
     (formationData || []).forEach((r: any) => {
       if (!dansPeriode(r.date || r.created_at)) return;
@@ -141,7 +164,30 @@ export default function RapportsPage() {
     });
     setFormation({ ca: fCa, benef: fCa });
 
-    // DEPENSES — affichees seulement, PAS retirees du benefice / CA
+    // WIFI ZONE — ventes + cout 16000 F / mois
+    let wCa = 0;
+    const wifiDates: string[] = [];
+    (wifiData || []).forEach((r: any) => {
+      const d = r.date || r.created_at;
+      if (!dansPeriode(d)) return;
+      const ca = n(r.prix_total || r.montant || r.total || r.prix);
+      wCa += ca;
+      if (d) wifiDates.push(String(d));
+      addJour(d, ca);
+    });
+    const nbMois = moisDansPeriode(wifiDates.length ? wifiDates : [dateDebut || dateFin || new Date().toISOString()]);
+    // Si on a des ventes WiFi, au moins 1 mois de cout
+    const moisCout = wCa > 0 ? Math.max(nbMois, 1) : nbMois > 0 ? nbMois : 0;
+    // Sans filtre de date et avec ventes : 1 mois de cout (mois en cours)
+    const coutWifi =
+      wCa > 0
+        ? COUT_WIFI_MENSUEL * (moisCout || 1)
+        : 0;
+    const wBenef = wCa - coutWifi;
+    setWifi({ ca: wCa, cout: coutWifi, benef: wBenef });
+    // Ajuster le graphique jour : le cout mensuel n'est pas par jour, on laisse le CA journalier
+
+    // Depenses — affichees, PAS retirees du benefice global
     let depSum = 0;
     const depListe: { id?: string; libelle: string; montant: number; date: string }[] = [];
     (depensesData || []).forEach((r: any) => {
@@ -170,9 +216,14 @@ export default function RapportsPage() {
     charger();
   }, [dateDebut, dateFin]);
 
-  // Benefice = activites (formation incluse). Depenses NON soustraites.
+  // Benefice total = activites + WiFi (apres cout 16000). Depenses NON soustraites.
   const beneficeTotal =
-    cmd.benef + maillots.benef + etiquettes.benef + business.benef + formation.benef;
+    cmd.benef +
+    maillots.benef +
+    etiquettes.benef +
+    business.benef +
+    formation.benef +
+    wifi.benef;
 
   const lignes = [
     { nom: "Commandes", benef: cmd.benef, couleur: "#7c3aed" },
@@ -180,6 +231,7 @@ export default function RapportsPage() {
     { nom: "Etiquettes", benef: etiquettes.benef, couleur: "#ea580c" },
     { nom: "Business", benef: business.benef, couleur: "#0f766e" },
     { nom: "Formation", benef: formation.benef, couleur: "#ca8a04" },
+    { nom: "WiFi Zone", benef: wifi.benef, couleur: "#0891b2" },
   ];
 
   const maxBarre = Math.max(...lignes.map((l) => Math.abs(l.benef)), 1);
@@ -196,7 +248,7 @@ export default function RapportsPage() {
       >
         <h2 style={{ margin: 0, fontSize: 18 }}>Rapports</h2>
         <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
-          Benefice total + graphiques + depenses (affichees, non retirees)
+          Benefice + WiFi Zone (cout 16 000 F/mois) + depenses affichees
         </p>
       </header>
 
@@ -267,11 +319,40 @@ export default function RapportsPage() {
                 {beneficeTotal.toLocaleString("fr-FR")} FCFA
               </div>
               <div style={{ fontSize: 12, opacity: 0.9, marginTop: 8 }}>
-                Commandes + Maillots + Etiquettes + Business + Formation
+                Commandes + Maillots + Etiquettes + Business + Formation + WiFi
               </div>
             </div>
 
-            {/* DEPENSES — marquees, PAS retirees */}
+            {/* Carte WiFi Zone detaillee */}
+            <div
+              style={{
+                background: "white",
+                border: "1px solid #a5f3fc",
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 20,
+              }}
+            >
+              <h3 style={{ margin: "0 0 12px", fontSize: 15, color: "#0e7490" }}>
+                WiFi Zone
+              </h3>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                <Mini titre="Ventes WiFi (CA)" valeur={wifi.ca} couleur="#0891b2" />
+                <Mini titre="Cout mensuel" valeur={wifi.cout} couleur="#dc2626" />
+                <Mini titre="Benefice WiFi" valeur={wifi.benef} couleur="#059669" />
+              </div>
+              <p style={{ margin: "10px 0 0", fontSize: 12, color: "#64748b" }}>
+                Cout fixe : 16 000 F par mois (retire du benefice WiFi uniquement)
+              </p>
+            </div>
+
+            {/* Depenses — affichees, non retirees */}
             <div
               style={{
                 background: "white",
@@ -295,7 +376,7 @@ export default function RapportsPage() {
                 </strong>
               </div>
               <p style={{ margin: "0 0 12px", fontSize: 12, color: "#94a3b8" }}>
-                Affichees pour suivi — elles ne sont pas retirees du benefice ni du CA
+                Affichees pour suivi — non retirees du benefice ni du CA
               </p>
               {listeDepenses.length === 0 ? (
                 <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>
@@ -372,7 +453,7 @@ export default function RapportsPage() {
             >
               <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>Benefices par activite</h3>
               <p style={{ margin: "0 0 16px", fontSize: 12, color: "#94a3b8" }}>
-                Formation incluse (barre jaune)
+                WiFi = ventes − 16 000 F/mois
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {lignes.map((l) => {
