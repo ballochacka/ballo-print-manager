@@ -1,281 +1,367 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-type Stock = {
-  id: string;
-  nom: string;
-  quantite: number;
-  seuil_alerte: number;
-  owner_id?: string;
-  created_at?: string;
-  date?: string;
-};
-
 export default function StocksPage() {
-  const router = useRouter();
-  const [items, setItems] = useState<Stock[]>([]);
+  const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [userId, setUserId] = useState<string | null>(null);
-
-  const [nom, setNom] = useState("");
-  const [quantite, setQuantite] = useState("");
-  const [seuil, setSeuil] = useState("5");
+  const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    nom: "",
+    quantite: "0",
+    seuil: "5",
+  });
 
-  const load = async (uid: string) => {
+  const charger = async () => {
+    setLoading(true);
     const { data, error } = await supabase
       .from("stocks")
-      .select("id, nom, quantite, seuil_alerte, owner_id, created_at, date")
-      .eq("owner_id", uid)
+      .select("*")
       .order("nom", { ascending: true });
 
     if (error) {
-      setMsg("Erreur: " + error.message);
-      setItems([]);
+      alert("Erreur chargement : " + error.message);
+      setRows([]);
     } else {
-      setItems(data || []);
+      setRows(data || []);
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    const init = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        router.replace("/login");
-        return;
-      }
-      setUserId(session.user.id);
-      await load(session.user.id);
-    };
-    init();
-  }, [router]);
+    charger();
+  }, []);
 
   const resetForm = () => {
-    setNom("");
-    setQuantite("");
-    setSeuil("5");
+    setForm({ nom: "", quantite: "0", seuil: "5" });
     setEditId(null);
+    setShowForm(false);
   };
 
-  const save = async () => {
-    if (!userId) return;
-    const q = Number(quantite);
-    const s = Number(seuil);
-    if (!nom.trim()) {
-      setMsg("Nom du produit obligatoire.");
-      return;
-    }
-    if (isNaN(q) || q < 0) {
-      setMsg("Quantite invalide.");
-      return;
-    }
-    if (isNaN(s) || s < 0) {
-      setMsg("Seuil invalide.");
+  const ouvrirModif = (r: any) => {
+    setEditId(r.id);
+    setForm({
+      nom: r.nom || "",
+      quantite: String(r.quantite ?? 0),
+      seuil: String(r.seuil ?? r.seuil_alerte ?? 5),
+    });
+    setShowForm(true);
+  };
+
+  const enregistrer = async () => {
+    if (!form.nom.trim()) {
+      alert("Nom du produit obligatoire");
       return;
     }
 
-    setSaving(true);
-    setMsg("");
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user) {
+      alert("Session expirée. Reconnecte-toi.");
+      return;
+    }
+
+    const payload = {
+      nom: form.nom.trim(),
+      quantite: Number(form.quantite) || 0,
+      seuil: Number(form.seuil) || 0,
+      owner_id: user.id,
+    };
 
     if (editId) {
       const { error } = await supabase
         .from("stocks")
-        .update({ nom: nom.trim(), quantite: q, seuil_alerte: s })
-        .eq("id", editId)
-        .eq("owner_id", userId);
+        .update({
+          nom: payload.nom,
+          quantite: payload.quantite,
+          seuil: payload.seuil,
+        })
+        .eq("id", editId);
+
       if (error) {
-        setMsg("Erreur: " + error.message);
-        setSaving(false);
+        alert("Erreur modification : " + error.message);
         return;
       }
-      setMsg("Stock mis a jour.");
     } else {
-      const { error } = await supabase.from("stocks").insert({
-        nom: nom.trim(),
-        quantite: q,
-        seuil_alerte: s,
-        owner_id: userId,
-        date: new Date().toISOString().slice(0, 10),
-      });
+      const { error } = await supabase.from("stocks").insert([payload]);
       if (error) {
-        setMsg("Erreur: " + error.message);
-        setSaving(false);
+        alert("Erreur création : " + error.message);
         return;
       }
-      setMsg("Produit ajoute.");
     }
 
     resetForm();
-    await load(userId);
-    setSaving(false);
+    charger();
   };
 
-  const startEdit = (row: Stock) => {
-    setEditId(row.id);
-    setNom(row.nom || "");
-    setQuantite(String(row.quantite ?? 0));
-    setSeuil(String(row.seuil_alerte ?? 5));
-    setMsg("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const remove = async (id: string) => {
-    if (!userId) return;
-    if (!confirm("Supprimer ce produit ?")) return;
-    const { error } = await supabase
-      .from("stocks")
-      .delete()
-      .eq("id", id)
-      .eq("owner_id", userId);
-    if (error) {
-      setMsg("Erreur: " + error.message);
+  const ajouterQuantite = async (r: any) => {
+    const saisie = prompt(
+      "Ajouter quelle quantité pour « " + r.nom + " » ?\n(Stock actuel : " + (r.quantite ?? 0) + ")",
+      "10"
+    );
+    if (saisie === null) return;
+    const plus = Number(saisie);
+    if (!plus || plus <= 0) {
+      alert("Quantité invalide");
       return;
     }
-    if (editId === id) resetForm();
-    await load(userId);
+
+    const nouvelle = (Number(r.quantite) || 0) + plus;
+    const { error } = await supabase
+      .from("stocks")
+      .update({ quantite: nouvelle })
+      .eq("id", r.id);
+
+    if (error) {
+      alert("Erreur : " + error.message);
+      return;
+    }
+    charger();
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const supprimer = async (id: string) => {
+    if (!confirm("Supprimer ce produit du stock ?")) return;
+    await supabase.from("stocks").delete().eq("id", id);
+    charger();
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
-      <header className="bg-blue-700 text-white px-4 py-4 flex items-center gap-3 shadow">
-        <Link href="/" className="text-white text-lg font-bold">
-          ←
-        </Link>
-        <h1 className="font-bold text-lg flex-1">Stocks</h1>
+    <div style={{ color: "#0f172a", background: "#f8fafc", minHeight: "100%" }}>
+      <header
+        style={{
+          background: "white",
+          borderBottom: "1px solid #e5e7eb",
+          padding: "12px 16px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 8,
+        }}
+      >
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18 }}>Stocks</h2>
+          <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>
+            Modifier, ajouter une quantité, ou créer un produit
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            resetForm();
+            setShowForm(true);
+          }}
+          style={{
+            background: "#7c3aed",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            padding: "8px 14px",
+            cursor: "pointer",
+          }}
+        >
+          + Nouveau produit
+        </button>
       </header>
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
-        <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm space-y-3">
-          <h2 className="font-bold text-sm text-slate-900">
-            {editId ? "Modifier le stock" : "Ajouter un produit"}
-          </h2>
-
-          <div>
-            <label className="text-xs text-slate-500 font-medium">Produit</label>
-            <input
-              value={nom}
-              onChange={(e) => setNom(e.target.value)}
-              placeholder="Ex: Maillot, Papier A4..."
-              className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-slate-500 font-medium">Quantite</label>
-              <input
-                type="number"
-                min="0"
-                value={quantite}
-                onChange={(e) => setQuantite(e.target.value)}
-                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-slate-500 font-medium">Seuil alerte</label>
-              <input
-                type="number"
-                min="0"
-                value={seuil}
-                onChange={(e) => setSeuil(e.target.value)}
-                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={save}
-              disabled={saving}
-              className="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl py-2.5 text-sm disabled:opacity-60"
+      <div style={{ padding: 16 }}>
+        {showForm && (
+          <div
+            style={{
+              background: "white",
+              border: "1px solid #e5e7eb",
+              borderRadius: 12,
+              padding: 16,
+              marginBottom: 16,
+            }}
+          >
+            <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>
+              {editId ? "Modifier le stock" : "Nouveau produit"}
+            </h3>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: 10,
+              }}
             >
-              {saving ? "..." : editId ? "Enregistrer" : "Ajouter"}
-            </button>
-            {editId && (
+              <input
+                placeholder="Nom du produit"
+                value={form.nom}
+                onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                min="0"
+                placeholder="Quantité"
+                value={form.quantite}
+                onChange={(e) => setForm({ ...form, quantite: e.target.value })}
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                min="0"
+                placeholder="Seuil alerte"
+                value={form.seuil}
+                onChange={(e) => setForm({ ...form, seuil: e.target.value })}
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <button
-                type="button"
+                onClick={enregistrer}
+                style={{
+                  background: "#7c3aed",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "8px 14px",
+                  cursor: "pointer",
+                }}
+              >
+                Enregistrer
+              </button>
+              <button
                 onClick={resetForm}
-                className="px-4 rounded-xl border border-slate-200 text-sm text-slate-600"
+                style={{
+                  background: "#f3f4f6",
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "8px 14px",
+                  cursor: "pointer",
+                }}
               >
                 Annuler
               </button>
-            )}
+            </div>
           </div>
+        )}
 
-          {msg && (
-            <p className="text-xs text-center text-blue-700 bg-blue-50 rounded-xl py-2 font-medium">
-              {msg}
-            </p>
+        <div
+          style={{
+            background: "white",
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            overflow: "hidden",
+          }}
+        >
+          {loading ? (
+            <div style={{ padding: 24, textAlign: "center" }}>Chargement...</div>
+          ) : rows.length === 0 ? (
+            <div style={{ padding: 24, textAlign: "center", color: "#6b7280" }}>
+              Aucun produit en stock
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "#f9fafb", textAlign: "left" }}>
+                    <th style={th}>Produit</th>
+                    <th style={th}>Quantité</th>
+                    <th style={th}>Seuil</th>
+                    <th style={th}>État</th>
+                    <th style={th}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => {
+                    const seuilVal = Number(r.seuil ?? r.seuil_alerte) || 0;
+                    const bas = (Number(r.quantite) || 0) <= seuilVal;
+                    return (
+                      <tr key={r.id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                        <td style={td}>
+                          <strong>{r.nom}</strong>
+                        </td>
+                        <td style={{ ...td, fontWeight: 700 }}>{r.quantite}</td>
+                        <td style={td}>{seuilVal}</td>
+                        <td style={td}>
+                          {bas ? (
+                            <span style={badgeRouge}>Stock bas</span>
+                          ) : (
+                            <span style={badgeVert}>OK</span>
+                          )}
+                        </td>
+                        <td style={td}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button onClick={() => ajouterQuantite(r)} style={btnVert}>
+                              + Stock
+                            </button>
+                            <button onClick={() => ouvrirModif(r)} style={btnBleu}>
+                              Modifier
+                            </button>
+                            <button onClick={() => supprimer(r.id)} style={btnRouge}>
+                              Supprimer
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 bg-blue-50">
-            <h2 className="font-bold text-sm text-blue-900">
-              Liste ({items.length})
-            </h2>
-          </div>
-
-          {items.length === 0 && (
-            <p className="text-sm text-slate-400 text-center py-8">Aucun stock.</p>
-          )}
-
-          <ul className="divide-y divide-slate-100">
-            {items.map((row) => {
-              const low = Number(row.quantite) <= Number(row.seuil_alerte);
-              return (
-                <li key={row.id} className="px-4 py-3 flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm text-slate-900 truncate">{row.nom}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Qte:{" "}
-                      <span className={low ? "text-red-600 font-black" : "font-bold"}>
-                        {row.quantite}
-                      </span>
-                      {" · "}Seuil {row.seuil_alerte}
-                      {low && (
-                        <span className="ml-2 text-red-600 font-bold">Alerte</span>
-                      )}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => startEdit(row)}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 font-bold"
-                  >
-                    Modifier
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => remove(row.id)}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold"
-                  >
-                    Suppr.
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
         </div>
       </div>
     </div>
   );
 }
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "10px 12px",
+  borderRadius: 8,
+  border: "1px solid #d1d5db",
+  boxSizing: "border-box",
+};
+const th: React.CSSProperties = { padding: "10px 12px", fontSize: 12, color: "#6b7280" };
+const td: React.CSSProperties = { padding: "10px 12px" };
+const btnVert: React.CSSProperties = {
+  background: "#d1fae5",
+  color: "#047857",
+  border: "none",
+  borderRadius: 6,
+  padding: "4px 8px",
+  cursor: "pointer",
+  fontSize: 11,
+  fontWeight: 600,
+};
+const btnBleu: React.CSSProperties = {
+  background: "#dbeafe",
+  color: "#1d4ed8",
+  border: "none",
+  borderRadius: 6,
+  padding: "4px 8px",
+  cursor: "pointer",
+  fontSize: 11,
+  fontWeight: 600,
+};
+const btnRouge: React.CSSProperties = {
+  background: "#fee2e2",
+  color: "#dc2626",
+  border: "none",
+  borderRadius: 6,
+  padding: "4px 8px",
+  cursor: "pointer",
+  fontSize: 11,
+};
+const badgeRouge: React.CSSProperties = {
+  background: "#fee2e2",
+  color: "#dc2626",
+  padding: "2px 8px",
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: 600,
+};
+const badgeVert: React.CSSProperties = {
+  background: "#d1fae5",
+  color: "#059669",
+  padding: "2px 8px",
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: 600,
+};
