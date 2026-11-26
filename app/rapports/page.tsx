@@ -52,7 +52,6 @@ export default function RapportsPage() {
       mapJour[j] = (mapJour[j] || 0) + benef;
     };
 
-    // Commandes
     let cCa = 0,
       cAchat = 0;
     (commandes || []).forEach((r: any) => {
@@ -65,7 +64,6 @@ export default function RapportsPage() {
     });
     setCmd({ ca: cCa, achat: cAchat, benef: cCa - cAchat });
 
-    // Maillots
     let mCa = 0,
       mAchat = 0;
     (maillotsData || []).forEach((r: any) => {
@@ -78,7 +76,6 @@ export default function RapportsPage() {
     });
     setMaillots({ ca: mCa, achat: mAchat, benef: mCa - mAchat });
 
-    // Étiquettes
     let eCa = 0,
       eAchat = 0;
     (etiquettesData || []).forEach((r: any) => {
@@ -91,7 +88,6 @@ export default function RapportsPage() {
     });
     setEtiquettes({ ca: eCa, achat: eAchat, benef: eCa - eAchat });
 
-    // Business
     let bCa = 0,
       bAchat = 0;
     (businessData || []).forEach((r: any) => {
@@ -104,7 +100,6 @@ export default function RapportsPage() {
     });
     setBusiness({ ca: bCa, achat: bAchat, benef: bCa - bAchat });
 
-    // Formation
     let fCa = 0;
     (formationData || []).forEach((r: any) => {
       if (!dansPeriode(r.created_at)) return;
@@ -156,7 +151,6 @@ export default function RapportsPage() {
       </header>
 
       <div style={{ padding: 16 }}>
-        {/* Filtres */}
         <div
           style={{
             display: "flex",
@@ -206,7 +200,6 @@ export default function RapportsPage() {
           <div style={{ padding: 24, textAlign: "center" }}>Chargement...</div>
         ) : (
           <>
-            {/* BÉNÉFICE TOTAL — inchangé */}
             <div
               style={{
                 background: "linear-gradient(135deg, #065f46 0%, #047857 50%, #ca8a04 100%)",
@@ -223,13 +216,11 @@ export default function RapportsPage() {
               <div style={{ fontSize: 32, fontWeight: 800 }}>
                 {beneficeTotal.toLocaleString("fr-FR")} FCFA
               </div>
-              <div style={{ fontSize: 12, opacity: 0.9, margin
               <div style={{ fontSize: 12, opacity: 0.9, marginTop: 8 }}>
                 Commandes + Maillots + Étiquettes + Business + Formation
               </div>
             </div>
 
-            {/* Cartes détail */}
             <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Détail des bénéfices</h3>
             <div
               style={{
@@ -264,7 +255,6 @@ export default function RapportsPage() {
               ))}
             </div>
 
-            {/* GRAPHIQUE 1 — barres par activité */}
             <div
               style={{
                 background: "white",
@@ -321,7 +311,6 @@ export default function RapportsPage() {
               </div>
             </div>
 
-            {/* GRAPHIQUE 2 — évolution par date */}
             <div
               style={{
                 background: "white",
@@ -333,11 +322,13 @@ export default function RapportsPage() {
             >
               <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>Évolution des bénéfices par date</h3>
               <p style={{ margin: "0 0 16px", fontSize: 12, color: "#94a3b8" }}>
-                Barre vers le haut = gain · vers le bas si un jour est négatif
+                Barre vers le haut = gain
               </p>
 
               {parJour.length === 0 ? (
-                <p style={{ color: "#94a3b8", fontSize: 13 }}>Pas encore de données sur cette période.</p>
+                <p style={{ color: "#94a3b8", fontSize: 13 }}>
+                  Pas encore de données sur cette période.
+                </p>
               ) : (
                 <div
                   style={{
@@ -350,7 +341,6 @@ export default function RapportsPage() {
                     position: "relative",
                   }}
                 >
-                  {/* ligne zéro */}
                   <div
                     style={{
                       position: "absolute",
@@ -415,7 +405,6 @@ export default function RapportsPage() {
               )}
             </div>
 
-            {/* Détail CA commandes */}
             <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Commandes (détail CA)</h3>
             <div
               style={{
